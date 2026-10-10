@@ -1,0 +1,48 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api        # 所有接口都以 /api 开头，和 Nginx 的 location /api/ 对应
+
+spring:
+  profiles:
+    active: h2                # h2：免装数据库直接试跑；dev：本地 MySQL；prod：服务器
+  servlet:
+    multipart:
+      max-file-size: 1MB        # 单张图片上限，和 PhotoService.MAX_IMAGE_BYTES、前端 MAX_MB 保持一致
+      max-request-size: 2MB     # 留出 albumId 等表单字段的余量
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+  sql:
+    init:
+      mode: always            # 启动时执行 schema.sql（建表语句带 IF NOT EXISTS，重复执行无害）
+      schema-locations: classpath:schema.sql
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer        # 前端请求头：Authorization: Bearer xxx
+  timeout: 2592000            # 登录有效期 30 天
+  is-concurrent: true
+  is-share: false
+  is-read-cookie: false
+  token-style: uuid
+  is-log: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html    # 接口文档：http://localhost:8080/api/swagger-ui.html
+
+app:
+  admin:
+    username: admin
+    password: admin123        # 仅本地用，生产环境用环境变量 ADMIN_PASSWORD 覆盖
+  storage:
+    type: local
+    thumb-width: 600
+    local:
+      dir: ./uploads
+      url-prefix: /api/files/

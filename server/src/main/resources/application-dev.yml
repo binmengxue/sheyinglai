@@ -1,0 +1,6 @@
+# 本地 MySQL（可用项目根目录的 docker-compose.yml 一键启动）
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/photo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456

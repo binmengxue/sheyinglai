@@ -1,0 +1,9 @@
+web/node_modules/
+dist/
+target/
+.idea/
+*.iml
+.vscode/
+server/data/
+server/uploads/
+photo.env

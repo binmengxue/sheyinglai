@@ -1,0 +1,17 @@
+# 放到 /etc/systemd/system/photo.service
+[Unit]
+Description=Sheyinglai photo server
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+User=photo
+WorkingDirectory=/srv/photo
+EnvironmentFile=/srv/photo/photo.env
+ExecStart=/usr/bin/java -Xms256m -Xmx768m -jar /srv/photo/app.jar --spring.profiles.active=prod
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

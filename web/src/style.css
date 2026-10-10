@@ -1,0 +1,16 @@
+:root {
+  --page-width: 1200px;
+  --text-muted: #8a8f98;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #fafafa;
+  color: #1f2329;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+a { color: inherit; text-decoration: none; }
+.container { max-width: var(--page-width); margin: 0 auto; padding: 0 16px; }
+.page-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 20px; }
+.page-title h1 { font-size: 24px; margin: 0; font-weight: 600; }
+.muted { color: var(--text-muted); font-size: 14px; }
