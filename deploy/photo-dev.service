@@ -1,0 +1,17 @@
+# 放到 /etc/systemd/system/photo-dev.service（测试环境后端，端口 8081）
+[Unit]
+Description=Sheyinglai photo server (test)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+User=photo
+WorkingDirectory=/srv/photo-dev
+EnvironmentFile=/srv/photo-dev/photo.env
+ExecStart=/usr/bin/java -Xms128m -Xmx384m -jar /srv/photo-dev/app.jar --spring.profiles.active=test
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

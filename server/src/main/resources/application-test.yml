@@ -1,0 +1,32 @@
+# 测试环境：和线上同一台服务器，独立进程（8081）、独立数据库、独立图片目录
+# 外部访问 https://sheyinglai.top/api-dev/ ，由 Nginx 转发到 8081（见 deploy/nginx-photo.conf）
+server:
+  port: 8081
+  servlet:
+    context-path: /api-dev
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/photo_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:photo}
+    password: ${DB_PASSWORD}
+
+app:
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    local:
+      dir: /srv/photo-dev/uploads
+      url-prefix: /api-dev/files/
+    oss:
+      endpoint: ${OSS_ENDPOINT:}
+      bucket: ${OSS_BUCKET:}
+      access-key-id: ${OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+      domain: ${OSS_DOMAIN:}
+
+logging:
+  file:
+    name: /srv/photo-dev/logs/app.log

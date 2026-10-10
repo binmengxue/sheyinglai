@@ -8,7 +8,8 @@ export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t)
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
 
 // 前后端同域，接口统一走 /api（开发时由 Vite 代理，线上由 Nginx 转发）
-const http = axios.create({ baseURL: '/api', timeout: 15000 })
+// `pnpm dev:test` 时通过 .env.test 把 VITE_API_BASE 设为 /api-dev，直连测试环境
+const http = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '/api', timeout: 15000 })
 
 http.interceptors.request.use((config) => {
   const token = getToken()

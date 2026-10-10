@@ -124,6 +124,26 @@ ssl_certificate_key /etc/nginx/cert/sheyinglai.top.key;
 
 切换后新上传的照片存 OSS，旧照片仍在服务器本地且能正常访问；但在后台删除旧照片时只删数据库记录，本地文件需要手动清理。建议图片还少的时候就尽早切换。
 
+### 6. 测试环境（https://sheyinglai.top/api-dev）
+
+本地默认（`pnpm dev` + h2）的数据和图片都存在本机。想让本地操作直接落到测试环境：
+
+**服务器一次性搭建**（和线上同一台机器，独立进程/数据库/图片目录）：
+
+1. `mkdir -p /srv/photo-dev/{uploads,logs} && chown -R photo:photo /srv/photo-dev`，建库 `photo_dev` 并给 `photo` 用户授权。
+2. 复制 `deploy/photo-dev.env.example` 为 `/srv/photo-dev/photo.env`（`chmod 600`），`deploy/photo-dev.service` 放到 `/etc/systemd/system/`。
+3. 更新 Nginx 配置（已含 `/api-dev/` 转发）：`nginx -t && systemctl reload nginx`。
+4. 打包后端 `mvn -q clean package -DskipTests`，上传 `server/target/app.jar` 到 `/srv/photo-dev/app.jar`，`systemctl enable --now photo-dev`。
+
+**本地使用**：
+
+```bash
+cd web
+pnpm dev:test     # 前端请求走 /api-dev，经 Vite 代理到测试环境；上传的图片存测试环境，不再写本地 server/uploads
+```
+
+不需要启动本地后端。登录账号为测试环境 `photo.env` 里配置的管理员。
+
 ## 四、说明
 
 - **管理员账号**：个人站点只有一个管理员，账号密码在 `photo.env` 里配置，不存数据库。
