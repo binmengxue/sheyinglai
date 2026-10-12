@@ -13,10 +13,11 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
-  sql:
-    init:
-      mode: always            # 启动时执行 schema.sql（建表语句带 IF NOT EXISTS，重复执行无害）
-      schema-locations: classpath:schema.sql
+  flyway:
+    # 表结构在 db/migration/V*.sql，启动时自动执行未执行过的版本
+    # 已有表但还没用过 Flyway 的库（升级前的线上库）：把 V1 记为基线，只执行 V2 及以后
+    baseline-on-migrate: true
+    baseline-version: 1
 
 mybatis-plus:
   configuration:
@@ -38,7 +39,8 @@ springdoc:
 
 app:
   admin:
-    username: admin
+    # 启动时自动创建/同步的管理员账号（手机号登录），旧相册和照片会归到这个账号名下
+    phone: "13800000000"
     password: admin123        # 仅本地用，生产环境用环境变量 ADMIN_PASSWORD 覆盖
   storage:
     type: local

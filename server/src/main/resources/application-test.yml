@@ -13,7 +13,7 @@ spring:
 
 app:
   admin:
-    username: ${ADMIN_USERNAME:admin}
+    phone: ${ADMIN_PHONE}
     password: ${ADMIN_PASSWORD}
   storage:
     type: ${STORAGE_TYPE:local}

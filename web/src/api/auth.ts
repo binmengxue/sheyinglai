@@ -1,8 +1,26 @@
 import { request } from '@/utils/request'
+import type { Me, User } from '@/types'
 
-export const login = (username: string, password: string) =>
-  request<{ token: string; username: string }>({ url: '/auth/login', method: 'post', data: { username, password } })
+interface LoginResult { token: string; me: Me }
 
-export const me = () => request<{ loggedIn: boolean; username: string }>({ url: '/auth/me' })
+export const login = (phone: string, password: string) =>
+  request<LoginResult>({ url: '/auth/login', method: 'post', data: { phone, password } })
+
+export const register = (data: { phone: string; password: string; nickname?: string; agree: boolean }) =>
+  request<LoginResult>({ url: '/auth/register', method: 'post', data })
+
+export const me = () => request<Me>({ url: '/auth/me' })
 
 export const logout = () => request<void>({ url: '/auth/logout', method: 'post' })
+
+export const updateProfile = (data: Pick<User, 'nickname' | 'gender' | 'bio' | 'city' | 'wechat'>) =>
+  request<User>({ url: '/users/me', method: 'put', data })
+
+export const changePassword = (oldPassword: string, newPassword: string) =>
+  request<void>({ url: '/users/me/password', method: 'put', data: { oldPassword, newPassword } })
+
+export function uploadAvatar(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return request<User>({ url: '/users/me/avatar', method: 'post', data: form, timeout: 60 * 1000 })
+}

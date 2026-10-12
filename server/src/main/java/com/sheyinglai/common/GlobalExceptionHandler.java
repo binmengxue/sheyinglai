@@ -1,6 +1,7 @@
 package com.sheyinglai.common;
 
 import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.exception.NotRoleException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -22,6 +23,11 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Result<Void> notLogin(NotLoginException e) {
         return Result.fail(401, "请先登录");
+    }
+
+    @ExceptionHandler(NotRoleException.class)
+    public Result<Void> notRole(NotRoleException e) {
+        return Result.fail(403, "无权操作");
     }
 
     @ExceptionHandler(BizException.class)
@@ -48,7 +54,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class,
-            HttpMessageNotReadableException.class, HttpRequestMethodNotSupportedException.class})
+            HttpMessageNotReadableException.class, HttpRequestMethodNotSupportedException.class,
+            java.time.format.DateTimeParseException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> badRequest(Exception e) {
         return Result.fail(400, "请求参数错误");

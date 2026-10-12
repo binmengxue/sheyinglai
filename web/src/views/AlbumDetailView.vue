@@ -1,36 +1,38 @@
 <template>
-  <template v-if="album">
-    <div class="page-title">
-      <div>
-        <el-page-header @back="$router.push('/albums')">
-          <template #content>
-            <span class="title">{{ album.title }}</span>
-            <el-tag v-if="!album.visible" size="small" type="info" style="margin-left: 8px">未公开</el-tag>
-          </template>
-        </el-page-header>
-        <p v-if="album.description" class="muted desc">{{ album.description }}</p>
+  <NavBar :title="album?.title ?? ''" :fallback="album ? `/p/${album.userId}` : '/'" />
+  <div v-if="album" class="page">
+    <div class="card head">
+      <div class="meta">
+        <el-tag v-if="album.style" effect="plain" round>{{ album.style }}</el-tag>
+        <el-tag v-if="!album.visible" size="small" type="info">未公开</el-tag>
+        <span v-if="album.location" class="muted loc"><el-icon><Location /></el-icon>{{ album.location }}</span>
       </div>
-      <div v-if="user.loggedIn" class="actions">
-        <el-button :icon="'Edit'" @click="editVisible = true">编辑</el-button>
-        <el-button type="primary" :icon="'Upload'" @click="uploadVisible = true">上传照片</el-button>
+      <p v-if="album.description" class="desc">{{ album.description }}</p>
+      <div class="actions">
+        <RouterLink :to="`/p/${album.userId}`" class="link">查看摄影师主页 <el-icon><ArrowRight /></el-icon></RouterLink>
+        <template v-if="canManage">
+          <el-button round size="small" :icon="'Edit'" @click="editVisible = true">编辑</el-button>
+          <el-button round size="small" class="cta" :icon="'Upload'" @click="uploadVisible = true">上传照片</el-button>
+        </template>
       </div>
     </div>
 
-    <PhotoGrid :photos="photos" :editable="user.loggedIn" @delete="onDelete" @cover="onCover" />
+    <PhotoGrid :photos="photos" :editable="canManage" @delete="onDelete" @cover="onCover" />
     <div class="more">
-      <el-button v-if="photos.length < total" :loading="loading" @click="loadPhotos()">加载更多</el-button>
+      <el-button v-if="photos.length < total" round :loading="loading" @click="loadPhotos()">加载更多</el-button>
     </div>
 
-    <template v-if="user.loggedIn">
+    <template v-if="canManage">
       <UploadDialog v-model="uploadVisible" :album-id="album.id" @done="loadPhotos(true)" />
       <AlbumDialog v-model="editVisible" :album="album" @saved="(a) => (album = { ...album!, ...a })" />
     </template>
-  </template>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import NavBar from '@/components/NavBar.vue'
 import PhotoGrid from '@/components/PhotoGrid.vue'
 import UploadDialog from '@/components/UploadDialog.vue'
 import AlbumDialog from '@/components/AlbumDialog.vue'
@@ -50,6 +52,8 @@ const total = ref(0)
 const loading = ref(false)
 const uploadVisible = ref(false)
 const editVisible = ref(false)
+/** 本人或管理员可以管理 */
+const canManage = computed(() => !!album.value && (user.user?.id === album.value.userId || user.isAdmin))
 
 async function loadPhotos(reset = false) {
   if (reset) {
@@ -90,8 +94,11 @@ watch(() => props.id, loadAll, { immediate: true })
 </script>
 
 <style lang="scss" scoped>
-.title { font-size: 20px; font-weight: 600; }
-.desc { margin: 10px 0 0; }
-.actions { display: flex; gap: 8px; flex-shrink: 0; }
-.more { text-align: center; margin-top: 24px; }
+.head { margin-bottom: 12px; }
+.meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.loc { display: inline-flex; align-items: center; gap: 2px; }
+.desc { margin: 10px 0 0; line-height: 1.6; white-space: pre-wrap; }
+.actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.link { display: inline-flex; align-items: center; margin-right: auto; font-size: 14px; color: var(--link); }
+.more { text-align: center; margin-top: 16px; }
 </style>

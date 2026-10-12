@@ -14,6 +14,8 @@ public class Photo {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long albumId;
+    /** 所属摄影师（和相册一致，冗余存一份方便查询） */
+    private Long userId;
     private String title;
     /** 存储中的路径，删除时用，不返回给前端 */
     @JsonIgnore

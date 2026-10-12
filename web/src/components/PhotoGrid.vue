@@ -34,12 +34,11 @@ const previewList = computed(() => props.photos.map((p) => p.url))
 </script>
 
 <style lang="scss" scoped>
-/* CSS 多列实现瀑布流，保持照片原始比例 */
-.grid { column-count: 3; column-gap: 12px; }
+/* CSS 多列实现瀑布流，保持照片原始比例；列数按容器宽度自动算（手机 1 列，PC 宽屏 4 列） */
+.grid { column-width: 260px; column-gap: 12px; }
 .item { position: relative; break-inside: avoid; margin-bottom: 12px; border-radius: 6px; overflow: hidden; background: #eee; }
 .img { display: block; width: 100%; cursor: zoom-in; }
 .ops { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; opacity: 0; transition: opacity 0.2s; }
 .item:hover .ops { opacity: 1; }
-@media (max-width: 900px) { .grid { column-count: 2; } }
-@media (max-width: 500px) { .grid { column-count: 1; } .ops { opacity: 1; } }
+@media (max-width: 500px) { .ops { opacity: 1; } }
 </style>

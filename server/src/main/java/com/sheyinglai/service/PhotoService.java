@@ -30,15 +30,11 @@ public class PhotoService {
     /** 单张图片上限 1MB，和 application.yml 的 multipart 配置、前端 MAX_MB 保持一致 */
     private static final long MAX_IMAGE_BYTES = 1024 * 1024;
 
-    /** albumId 为空时返回所有公开相册里的最新照片（首页用） */
-    public PageResult<Photo> page(Long albumId, long page, long size, boolean includeHidden) {
-        LambdaQueryWrapper<Photo> q = new LambdaQueryWrapper<Photo>().orderByDesc(Photo::getId);
-        if (albumId != null) {
-            albumService.get(albumId, includeHidden);
-            q.eq(Photo::getAlbumId, albumId);
-        } else if (!includeHidden) {
-            q.inSql(Photo::getAlbumId, "SELECT id FROM album WHERE visible = TRUE");
-        }
+    /** 某个相册里的照片 */
+    public PageResult<Photo> page(Long albumId, long page, long size) {
+        albumService.get(albumId); // 校验相册可见
+        LambdaQueryWrapper<Photo> q = new LambdaQueryWrapper<Photo>()
+                .eq(Photo::getAlbumId, albumId).orderByDesc(Photo::getId);
         Page<Photo> p = photoMapper.selectPage(Page.of(Math.max(1, page), Math.max(1, Math.min(size, 100))), q);
         return PageResult.of(p);
     }
@@ -50,11 +46,12 @@ public class PhotoService {
         if (file.getSize() > MAX_IMAGE_BYTES) {
             throw new BizException("图片不可以超过 1M");
         }
-        Album album = albumService.get(albumId, true);
+        Album album = albumService.getOwned(albumId);
         StoredFile f = storage.store(file);
 
         Photo photo = new Photo();
         photo.setAlbumId(albumId);
+        photo.setUserId(album.getUserId());
         photo.setTitle(stripExt(file.getOriginalFilename()));
         photo.setStorageKey(f.key());
         photo.setUrl(f.url());
@@ -78,6 +75,7 @@ public class PhotoService {
         if (photo == null) {
             throw new BizException(404, "照片不存在");
         }
+        albumService.getOwned(photo.getAlbumId());
         storage.delete(photo.getStorageKey());
         photoMapper.deleteById(id);
 

@@ -1,16 +1,81 @@
 :root {
-  --page-width: 1200px;
+  --app-width: 750px;
+  --tab-height: 58px;
+  --bg: #f6f7f9;
+  --card: #fff;
+  --text: #1a1a1a;
   --text-muted: #8a8f98;
+  --brand: #ffe14d;
+  --brand-strong: #ffd400;
+  --brand-soft: #fff6c7;
+  --ok: #18b47b;
+  --link: #3c7bff;
+  --radius: 14px;
+
+  /* Element Plus 主色用深色，亮黄只做点缀和主按钮（黄底白字看不清） */
+  --el-color-primary: #1f2329;
+  --el-color-primary-light-3: #62666d;
+  --el-color-primary-light-5: #8f9399;
+  --el-color-primary-light-7: #bcbec2;
+  --el-color-primary-light-8: #d2d3d4;
+  --el-color-primary-light-9: #e9e9ea;
+  --el-color-primary-dark-2: #000;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { background: #e9ebef; }
 body {
   margin: 0;
-  background: #fafafa;
-  color: #1f2329;
+  color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 15px;
 }
 a { color: inherit; text-decoration: none; }
-.container { max-width: var(--page-width); margin: 0 auto; padding: 0 16px; }
-.page-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 20px; }
-.page-title h1 { font-size: 24px; margin: 0; font-weight: 600; }
-.muted { color: var(--text-muted); font-size: 14px; }
+img { display: block; }
+
+.page { padding: 12px 12px 24px; }
+.card { background: var(--card); border-radius: var(--radius); padding: 16px; }
+.card + .card { margin-top: 12px; }
+.section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 17px; font-weight: 700; }
+.section-title::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--brand-strong); }
+.muted { color: var(--text-muted); font-size: 13px; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price { font-weight: 700; }
+.price small { font-size: 12px; font-weight: 600; }
+
+/* 亮黄主按钮（立即预约、保存等） */
+.cta.el-button {
+  --el-button-bg-color: var(--brand);
+  --el-button-border-color: var(--brand);
+  --el-button-text-color: var(--text);
+  --el-button-hover-bg-color: var(--brand-strong);
+  --el-button-hover-border-color: var(--brand-strong);
+  --el-button-hover-text-color: var(--text);
+  --el-button-active-bg-color: var(--brand-strong);
+  --el-button-active-border-color: var(--brand-strong);
+  --el-button-active-text-color: var(--text);
+  font-weight: 700;
+}
+
+/* 筛选用的胶囊按钮 */
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex-shrink: 0; padding: 6px 14px; border-radius: 999px; background: #fff; color: #444; font-size: 14px; cursor: pointer; border: none; }
+.chip.active { background: var(--brand); color: var(--text); font-weight: 700; }
+
+/* 带黄色下划线高亮的文字 */
+.hl { background: linear-gradient(transparent 60%, var(--brand) 60%); }
+
+.el-dialog { max-width: calc(100vw - 24px); }
+.el-drawer.btt { border-radius: 18px 18px 0 0; }
+
+/* 只在某一端显示（只做隐藏，不改元素自己的 display） */
+@media (max-width: 767.98px) { .desktop-only { display: none !important; } }
+
+/* ===== PC（≥ 768px）：顶部导航 + 宽屏；工作台加左侧菜单（见 App.vue） ===== */
+@media (min-width: 768px) {
+  :root { --page-width: 1200px; --header-height: 60px; }
+  html { background: var(--bg); }
+  .mobile-only { display: none !important; }
+  .page { padding: 0 0 32px; }
+  .chips { flex-wrap: wrap; overflow: visible; }
+}

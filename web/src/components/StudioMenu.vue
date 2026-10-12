@@ -1,0 +1,54 @@
+<template>
+  <nav class="studio-menu">
+    <div v-if="user.user" class="me">
+      <el-avatar :size="44" :src="user.user.avatarUrl">{{ user.user.nickname.slice(0, 1) }}</el-avatar>
+      <div class="info">
+        <div class="name ellipsis">{{ user.user.nickname }}</div>
+        <div class="muted">UID {{ user.user.id }}</div>
+      </div>
+    </div>
+    <el-menu :default-active="active" router>
+      <el-menu-item v-for="m in items" :key="m.to" :index="m.to">
+        <el-icon><component :is="m.icon" /></el-icon>
+        <span>{{ m.label }}</span>
+      </el-menu-item>
+    </el-menu>
+  </nav>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+
+const user = useUserStore()
+const route = useRoute()
+
+const items = computed(() => {
+  const id = user.user?.id
+  return [
+    { to: '/me', label: '个人中心', icon: 'House' },
+    { to: '/orders', label: '我的订单', icon: 'Tickets' },
+    { to: '/studio/albums', label: '我的客片', icon: 'Picture' },
+    { to: '/studio/profile', label: '接单设置', icon: 'Setting' },
+    { to: `/p/${id}/schedule`, label: '我的档期', icon: 'Calendar' },
+    { to: '/studio/stats', label: '经营数据', icon: 'DataLine' },
+    { to: `/p/${id}`, label: '我的主页', icon: 'User' },
+    ...(user.isAdmin ? [{ to: '/admin', label: '管理后台', icon: 'Management' }] : []),
+  ]
+})
+
+/** 编辑资料归到「个人中心」下高亮 */
+const active = computed(() => (route.path === '/me/edit' ? '/me' : route.path))
+</script>
+
+<style lang="scss" scoped>
+.studio-menu { background: #fff; border-radius: var(--radius); padding: 12px 8px; }
+.me { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14px; margin-bottom: 6px; border-bottom: 1px solid #f0f0f0; }
+.info { min-width: 0; }
+.name { font-weight: 700; }
+.el-menu { border-right: none; --el-menu-item-height: 44px; }
+.el-menu-item { border-radius: 10px; margin: 2px 0; }
+.el-menu-item.is-active { background: var(--brand-soft); color: var(--text); font-weight: 700; }
+.el-menu-item.is-active::before { content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--brand-strong); }
+</style>

@@ -1,7 +1,6 @@
 package com.sheyinglai.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.stp.StpUtil;
 import com.sheyinglai.common.Result;
 import com.sheyinglai.dto.AlbumReq;
 import com.sheyinglai.entity.Album;
@@ -19,14 +18,22 @@ public class AlbumController {
 
     private final AlbumService albumService;
 
+    /** 某个摄影师的客片，可按分类筛选 */
     @GetMapping
-    public Result<List<Album>> list() {
-        return Result.ok(albumService.list(StpUtil.isLogin()));
+    public Result<List<Album>> list(@RequestParam Long userId, @RequestParam(required = false) String style) {
+        return Result.ok(albumService.list(userId, style));
+    }
+
+    /** 我的客片（含不公开的），工作台管理用 */
+    @SaCheckLogin
+    @GetMapping("/mine")
+    public Result<List<Album>> mine() {
+        return Result.ok(albumService.mine());
     }
 
     @GetMapping("/{id}")
     public Result<Album> get(@PathVariable Long id) {
-        return Result.ok(albumService.get(id, StpUtil.isLogin()));
+        return Result.ok(albumService.get(id));
     }
 
     @SaCheckLogin

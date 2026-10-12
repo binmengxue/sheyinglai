@@ -13,8 +13,8 @@ public class AppProperties {
 
     @Data
     public static class Admin {
-        /** 个人站点只有一个管理员（你自己），账号密码放在配置/环境变量里 */
-        private String username = "admin";
+        /** 平台管理员，启动时由 AdminInitializer 按这里的手机号和密码创建或同步 */
+        private String phone = "13800000000";
         private String password = "admin123";
     }
 

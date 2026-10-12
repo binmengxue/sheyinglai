@@ -1,28 +1,41 @@
 <template>
-  <AppHeader />
-  <main class="container main">
+  <!-- 手机：单列 + 底部 Tab -->
+  <div v-if="!isDesktop" class="app" :class="{ 'with-tab': route.meta.tab }">
     <RouterView />
-  </main>
-  <footer class="footer">
-    <span>© {{ new Date().getFullYear() }} 摄影来</span>
-    <!-- 备案通过后必须在网站底部展示备案号并链接到工信部网站，把下面的文字换成你的备案号 -->
-    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">苏ICP备XXXXXXXX号</a>
-  </footer>
+    <TabBar v-if="route.meta.tab" :active="route.meta.tab" />
+  </div>
+
+  <!-- PC：顶部导航；工作台页面再加左侧菜单（网盘式） -->
+  <div v-else class="desk">
+    <AppHeader />
+    <div v-if="route.meta.studio" class="studio">
+      <StudioMenu class="menu" />
+      <main class="content"><RouterView /></main>
+    </div>
+    <main v-else class="wide"><RouterView /></main>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import TabBar from '@/components/TabBar.vue'
 import AppHeader from '@/components/AppHeader.vue'
-import { useUserStore } from '@/stores/user'
+import StudioMenu from '@/components/StudioMenu.vue'
+import { useDevice } from '@/composables/useDevice'
 
-const user = useUserStore()
-onMounted(() => user.fetchMe().catch(() => undefined))
+const route = useRoute()
+const { isDesktop } = useDevice()
 </script>
 
 <style lang="scss" scoped>
-.main { min-height: calc(100vh - 140px); padding-bottom: 40px; }
-.footer {
-  display: flex; justify-content: center; gap: 16px;
-  padding: 24px 16px; font-size: 13px; color: var(--text-muted); border-top: 1px solid #eee;
-}
+/* 手机版式 */
+.app { position: relative; max-width: var(--app-width); min-height: 100vh; margin: 0 auto; background: var(--bg); }
+.app.with-tab { padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom)); }
+
+/* PC 版式 */
+.desk { min-height: 100vh; background: var(--bg); }
+.wide { max-width: var(--page-width); margin: 0 auto; padding: 20px 24px 40px; }
+.studio { display: flex; gap: 20px; max-width: var(--page-width); margin: 0 auto; padding: 20px 24px 40px; }
+.menu { position: sticky; top: calc(var(--header-height) + 20px); align-self: flex-start; flex-shrink: 0; width: 200px; }
+.content { flex: 1; min-width: 0; }
 </style>

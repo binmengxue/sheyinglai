@@ -1,7 +1,7 @@
 import { request } from '@/utils/request'
 import type { PageResult, Photo } from '@/types'
 
-export const listPhotos = (params: { albumId?: number; page?: number; size?: number }) =>
+export const listPhotos = (params: { albumId: number; page?: number; size?: number }) =>
   request<PageResult<Photo>>({ url: '/photos', params })
 
 export const deletePhoto = (id: number) => request<void>({ url: `/photos/${id}`, method: 'delete' })
