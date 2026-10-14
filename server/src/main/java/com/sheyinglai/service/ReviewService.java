@@ -10,6 +10,7 @@ import com.sheyinglai.common.PageResult;
 import com.sheyinglai.dto.BookingReqs;
 import com.sheyinglai.dto.Views;
 import com.sheyinglai.entity.Booking;
+import com.sheyinglai.entity.Notification;
 import com.sheyinglai.entity.Photographer;
 import com.sheyinglai.entity.Review;
 import com.sheyinglai.mapper.BookingMapper;
@@ -36,6 +37,7 @@ public class ReviewService {
     private final PhotographerMapper photographerMapper;
     private final BookingService bookingService;
     private final UserService userService;
+    private final NotificationService notificationService;
 
     @Transactional
     public Review create(Long bookingId, BookingReqs.ReviewReq req) {
@@ -51,6 +53,9 @@ public class ReviewService {
         bookingMapper.update(null, new LambdaUpdateWrapper<Booking>()
                 .set(Booking::getReviewed, true).eq(Booking::getId, b.getId()));
         refreshRating(b.getPhotographerId());
+        notificationService.send(b.getPhotographerId(), Notification.TYPE_REVIEW, "收到新评价",
+                notificationService.nickname(b.getCustomerId()) + " 给了你 " + req.score() + " 星评价",
+                "/p/" + b.getPhotographerId());
         return r;
     }
 

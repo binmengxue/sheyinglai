@@ -40,7 +40,8 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { toast } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import { changePassword, updateProfile } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
@@ -59,7 +60,7 @@ async function save() {
   saving.value = true
   try {
     user.setUser(await updateProfile(form))
-    ElMessage.success('已保存')
+    toast.success('已保存')
     router.back()
   } finally {
     saving.value = false
@@ -79,7 +80,7 @@ async function savePwd() {
   pwdSaving.value = true
   try {
     await changePassword(pwd.oldPassword, pwd.newPassword)
-    ElMessage.success('密码已修改')
+    toast.success('密码已修改')
     pwd.oldPassword = ''
     pwd.newPassword = ''
   } finally {

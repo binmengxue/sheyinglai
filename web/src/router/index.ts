@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { toast } from '@/utils/message'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: '/albums/:id', name: 'album', component: () => import('@/views/AlbumDetailView.vue'), props: true },
     { path: '/orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { tab: 'orders', auth: true, studio: true, title: '我的订单' } },
     { path: '/me', name: 'me', component: () => import('@/views/MeView.vue'), meta: { tab: 'me', auth: true, studio: true, title: '个人中心' } },
+    { path: '/messages', name: 'messages', component: () => import('@/views/MessagesView.vue'), meta: { auth: true, studio: true, title: '消息' } },
     { path: '/me/edit', name: 'profile-edit', component: () => import('@/views/ProfileEditView.vue'), meta: { auth: true, studio: true, title: '编辑资料' } },
     { path: '/studio/profile', name: 'studio-profile', component: () => import('@/views/StudioProfileView.vue'), meta: { auth: true, studio: true, title: '接单设置' } },
     { path: '/studio/albums', name: 'studio-albums', component: () => import('@/views/StudioAlbumsView.vue'), meta: { auth: true, studio: true, title: '我的客片' } },
@@ -41,8 +43,14 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const user = useUserStore()
   await user.ensure()
-  if (to.meta.auth && !user.loggedIn) return { path: '/login', query: { redirect: to.fullPath } }
-  if (to.meta.admin && !user.isAdmin) return '/'
+  if (to.meta.auth && !user.loggedIn) {
+    toast.info('请先登录')
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (to.meta.admin && !user.isAdmin) {
+    toast.warning('无权访问该页面')
+    return '/'
+  }
 })
 
 router.afterEach((to) => {

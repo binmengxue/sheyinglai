@@ -8,6 +8,11 @@
         <RouterLink to="/me" :class="{ active: route.meta.studio && route.path !== '/orders' }">工作台</RouterLink>
       </nav>
       <div class="right">
+        <RouterLink v-if="user.loggedIn" to="/messages" class="bell" title="消息">
+          <el-badge :value="notification.unread" :hidden="!notification.unread" :max="99">
+            <el-icon :size="22"><Bell /></el-icon>
+          </el-badge>
+        </RouterLink>
         <el-dropdown v-if="user.loggedIn && user.user" trigger="click" @command="onCommand">
           <span class="who">
             <el-avatar :size="32" :src="user.user.avatarUrl">{{ user.user.nickname.slice(0, 1) }}</el-avatar>
@@ -34,8 +39,11 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
+import { confirm, toast } from '@/utils/message'
 
 const user = useUserStore()
+const notification = useNotificationStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -49,7 +57,9 @@ async function onCommand(cmd: string) {
   if (cmd === 'home') router.push(`/p/${user.user!.id}`)
   else if (cmd === 'studio') router.push('/me')
   else if (cmd === 'logout') {
+    if (!(await confirm('确定退出登录？', { type: 'info' }))) return
     await user.logout()
+    toast.success('已退出登录')
     router.replace('/')
   }
 }
@@ -64,6 +74,8 @@ async function onCommand(cmd: string) {
 .nav a:hover { color: var(--text); }
 .nav a.active { color: var(--text); font-weight: 700; border-color: var(--brand-strong); }
 .right { display: flex; align-items: center; gap: 8px; }
+.bell { display: flex; align-items: center; margin-right: 12px; color: #555; }
+.bell:hover, .bell.router-link-active { color: var(--text); }
 .who { display: flex; align-items: center; gap: 8px; cursor: pointer; outline: none; }
 .name { max-width: 8em; font-size: 14px; }
 </style>

@@ -7,6 +7,7 @@ import com.sheyinglai.common.BizException;
 import com.sheyinglai.entity.Album;
 import com.sheyinglai.entity.AlbumLike;
 import com.sheyinglai.entity.Follow;
+import com.sheyinglai.entity.Notification;
 import com.sheyinglai.mapper.AlbumLikeMapper;
 import com.sheyinglai.mapper.AlbumMapper;
 import com.sheyinglai.mapper.FollowMapper;
@@ -30,6 +31,7 @@ public class SocialService {
     private final AlbumMapper albumMapper;
     private final AlbumService albumService;
     private final PhotographerService photographerService;
+    private final NotificationService notificationService;
 
     public void follow(Long photographerId) {
         Long uid = Auth.uid();
@@ -44,8 +46,11 @@ public class SocialService {
         try {
             followMapper.insert(f);
         } catch (DuplicateKeyException ignored) {
-            // 已关注
+            // 已关注，不再重复通知
+            return;
         }
+        notificationService.send(photographerId, Notification.TYPE_FOLLOW, "新增粉丝",
+                notificationService.nickname(uid) + " 关注了你", "/p/" + uid);
     }
 
     public void unfollow(Long photographerId) {

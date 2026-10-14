@@ -9,6 +9,7 @@ import com.sheyinglai.common.PageResult;
 import com.sheyinglai.dto.BookingReqs;
 import com.sheyinglai.dto.Views;
 import com.sheyinglai.entity.Booking;
+import com.sheyinglai.entity.Notification;
 import com.sheyinglai.entity.Photographer;
 import com.sheyinglai.entity.User;
 import com.sheyinglai.mapper.BookingMapper;
@@ -20,6 +21,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,7 @@ public class BookingService {
     private final ScheduleService scheduleService;
     private final UserService userService;
     private final StatService statService;
+    private final NotificationService notificationService;
 
     @Transactional
     public Booking create(BookingReqs.CreateReq req) {
@@ -74,6 +77,8 @@ public class BookingService {
         b.setCreatedAt(LocalDateTime.now());
         bookingMapper.insert(b);
         statService.incr(p.getUserId(), StatService.Kind.CONSULT);
+        notify(b.getPhotographerId(), "新的预约",
+                notificationService.nickname(uid) + " 预约了你 " + when(b) + " 的拍摄，请尽快确认", "photographer");
         return b;
     }
 
@@ -118,16 +123,24 @@ public class BookingService {
         if (overlap) {
             throw new BizException("和已确认的预约时间冲突，请先拒绝或与客户协商改期");
         }
-        return transit(b, Booking.CONFIRMED, w -> w.set(Booking::getRespondedAt, LocalDateTime.now()));
+        Views.BookingView v = transit(b, Booking.CONFIRMED, w -> w.set(Booking::getRespondedAt, LocalDateTime.now()));
+        notify(b.getCustomerId(), "摄影师已接单",
+                "你预约的 " + when(b) + " 的拍摄已确认，可以在订单里查看摄影师联系方式", "customer");
+        return v;
     }
 
+    @Transactional
     public Views.BookingView reject(Long id) {
         Booking b = load(id);
         mustBePhotographer(b);
         mustBe(b, Booking.PENDING);
-        return transit(b, Booking.REJECTED, w -> w.set(Booking::getRespondedAt, LocalDateTime.now()));
+        Views.BookingView v = transit(b, Booking.REJECTED, w -> w.set(Booking::getRespondedAt, LocalDateTime.now()));
+        notify(b.getCustomerId(), "预约未被接受",
+                "你预约的 " + when(b) + " 的拍摄摄影师暂时无法接单，可以看看其他摄影师", "customer");
+        return v;
     }
 
+    @Transactional
     public Views.BookingView cancel(Long id) {
         Booking b = load(id);
         Long uid = Auth.uid();
@@ -135,7 +148,12 @@ public class BookingService {
             throw new BizException(403, "无权操作");
         }
         mustBe(b, Booking.PENDING, Booking.CONFIRMED);
-        return transit(b, Booking.CANCELLED, w -> w.set(Booking::getCancelledBy, uid));
+        Views.BookingView v = transit(b, Booking.CANCELLED, w -> w.set(Booking::getCancelledBy, uid));
+        boolean byCustomer = uid.equals(b.getCustomerId());
+        notify(byCustomer ? b.getPhotographerId() : b.getCustomerId(), "预约已取消",
+                notificationService.nickname(uid) + " 取消了 " + when(b) + " 的拍摄预约",
+                byCustomer ? "photographer" : "customer");
+        return v;
     }
 
     @Transactional
@@ -150,6 +168,7 @@ public class BookingService {
         });
         photographerMapper.update(null, new LambdaUpdateWrapper<Photographer>()
                 .setSql("deal_count = deal_count + 1").eq(Photographer::getUserId, b.getPhotographerId()));
+        notify(b.getCustomerId(), "拍摄已完成", when(b) + " 的拍摄已完成，快去给摄影师写个评价吧", "customer");
         return v;
     }
 
@@ -179,6 +198,17 @@ public class BookingService {
         Booking fresh = bookingMapper.selectById(b.getId());
         Map<Long, User> users = userService.mapByIds(List.of(fresh.getCustomerId(), fresh.getPhotographerId()));
         return view(fresh, users, Auth.uid());
+    }
+
+    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("M月d日 HH:mm");
+
+    private static String when(Booking b) {
+        return b.getShootDate().atTime(b.getStartTime()).format(WHEN);
+    }
+
+    /** 通知订单另一方，role 决定跳到订单页的哪个 tab */
+    private void notify(Long userId, String title, String content, String role) {
+        notificationService.send(userId, Notification.TYPE_BOOKING, title, content, "/orders?role=" + role);
     }
 
     private Views.BookingView view(Booking b, Map<Long, User> users, Long viewer) {

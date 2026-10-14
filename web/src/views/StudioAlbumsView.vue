@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { toast, confirm } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import AlbumDialog from '@/components/AlbumDialog.vue'
 import { deleteAlbum, myAlbums } from '@/api/album'
@@ -57,13 +57,10 @@ function openDialog(a: Album | null) {
 }
 
 async function remove(a: Album) {
-  const ok = await ElMessageBox.confirm(`删除「${a.title}」及其中 ${a.photoCount ?? 0} 张照片？此操作不可恢复`, '确认删除', {
-    type: 'warning',
-    confirmButtonText: '删除',
-  }).catch(() => false)
+  const ok = await confirm(`删除「${a.title}」及其中 ${a.photoCount ?? 0} 张照片？此操作不可恢复`, { title: '确认删除', confirmText: '删除' })
   if (!ok) return
   await deleteAlbum(a.id)
-  ElMessage.success('已删除')
+  toast.success('已删除')
   load()
 }
 

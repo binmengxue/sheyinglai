@@ -18,12 +18,13 @@ export const useUserStore = defineStore('user', () => {
   /** 刷新页面后用 token 取一次当前用户，路由守卫里调用，只请求一次 */
   function ensure() {
     if (!getToken()) return Promise.resolve()
-    loading ??= fetchMe().catch(() => undefined)
+    loading ??= fetchMe(true).catch(() => undefined)
     return loading
   }
 
-  async function fetchMe() {
-    me.value = await authApi.me()
+  /** silent：后台静默校验登录态时不弹错误 */
+  async function fetchMe(silent = false) {
+    me.value = await authApi.me({ silent })
     if (!me.value.loggedIn) clearToken()
   }
 
@@ -40,7 +41,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout() {
-    await authApi.logout().catch(() => undefined)
+    await authApi.logout({ silent: true }).catch(() => undefined)
     clearToken()
     loading = null
     me.value = { loggedIn: false, user: null, photographer: null, admin: false }

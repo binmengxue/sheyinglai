@@ -44,7 +44,7 @@
             <el-button round class="cta" @click="$router.push('/studio/albums')">管理客片</el-button>
           </template>
           <template v-else>
-            <el-button round plain class="ghost" :icon="d.followed ? 'Check' : 'Plus'" @click="toggleFollow">
+            <el-button round plain class="ghost" :icon="d.followed ? 'Check' : 'Plus'" :loading="following" @click="toggleFollow">
               {{ d.followed ? '已关注' : '关注' }}
             </el-button>
             <!-- PC：预约入口放在资料区，不用底部浮动栏 -->
@@ -95,6 +95,10 @@
 
     <PriceDetailDrawer v-if="ready" v-model="priceVisible" :p="d.profile" />
   </div>
+  <template v-else-if="error">
+    <NavBar title="" fallback="/" />
+    <el-empty description="加载失败"><el-button round @click="load">重试</el-button></el-empty>
+  </template>
   <div v-else v-loading="true" style="height: 60vh" />
 </template>
 
@@ -109,6 +113,7 @@ import { follow, getPhotographer, listReviews, unfollow } from '@/api/photograph
 import { listAlbums } from '@/api/album'
 import { useUserStore } from '@/stores/user'
 import { genderMark, getLocation } from '@/utils/format'
+import { toast } from '@/utils/message'
 import type { Album, PhotographerDetail, ReviewView } from '@/types'
 
 const props = defineProps<{ id: string }>()
@@ -116,6 +121,7 @@ const user = useUserStore()
 const router = useRouter()
 
 const d = ref<PhotographerDetail | null>(null)
+const error = ref(false)
 const c = computed(() => d.value!.card)
 const ready = computed(() => !!d.value?.profile.pricePerHour)
 const allCount = computed(() => d.value?.styleCounts.reduce((s, x) => s + x.count, 0) ?? 0)
@@ -133,11 +139,17 @@ let reviewPage = 0
 async function load() {
   const id = Number(props.id)
   d.value = null
+  error.value = false
   tab.value = 'albums'
   style.value = ''
   reviews.value = []
   reviewPage = 0
-  d.value = await getPhotographer(id, await getLocation())
+  try {
+    d.value = await getPhotographer(id, await getLocation())
+  } catch {
+    error.value = true
+    return
+  }
   loadAlbums()
   loadReviews()
 }
@@ -163,17 +175,29 @@ function setStyle(s: string) {
   loadAlbums()
 }
 
+const following = ref(false)
+
 async function toggleFollow() {
-  if (!user.loggedIn) return router.push({ path: '/login', query: { redirect: `/p/${props.id}` } })
-  const v = d.value!
-  if (v.followed) {
-    await unfollow(v.card.id)
-    v.fans--
-  } else {
-    await follow(v.card.id)
-    v.fans++
+  if (!user.loggedIn) {
+    toast.info('请先登录')
+    return router.push({ path: '/login', query: { redirect: `/p/${props.id}` } })
   }
-  v.followed = !v.followed
+  if (following.value) return
+  const v = d.value!
+  following.value = true
+  try {
+    if (v.followed) {
+      await unfollow(v.card.id)
+      v.fans--
+    } else {
+      await follow(v.card.id)
+      v.fans++
+    }
+    v.followed = !v.followed
+    toast.success(v.followed ? '已关注' : '已取消关注')
+  } finally {
+    following.value = false
+  }
 }
 
 watch(() => props.id, load, { immediate: true })

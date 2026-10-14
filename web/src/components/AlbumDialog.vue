@@ -34,7 +34,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/utils/message'
 import { createAlbum, updateAlbum } from '@/api/album'
 import { STYLES } from '@/utils/format'
 import type { Album, AlbumForm } from '@/types'
@@ -62,7 +62,7 @@ async function submit() {
   saving.value = true
   try {
     const saved = props.album ? await updateAlbum(props.album.id, form) : await createAlbum(form)
-    ElMessage.success('已保存')
+    toast.success('已保存')
     visible.value = false
     emit('saved', saved)
   } finally {

@@ -39,7 +39,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ElMessage, type UploadFile } from 'element-plus'
+import { isAxiosError } from 'axios'
+import { type UploadFile } from 'element-plus'
+import { toast } from '@/utils/message'
 import { uploadPhoto } from '@/api/photo'
 
 const props = defineProps<{ albumId: number }>()
@@ -53,6 +55,8 @@ type Status = 'waiting' | 'uploading' | 'success' | 'error'
 interface Task { uid: number; file: File; name: string; progress: number; status: Status }
 
 const tasks = ref<Task[]>([])
+/** 最近一次失败原因，汇总提示里带上 */
+let lastError = ''
 const running = ref(false)
 const finished = computed(() => tasks.value.filter((t) => t.status === 'success').length)
 
@@ -61,7 +65,7 @@ watch(visible, (v) => { if (v) tasks.value = [] })
 function onChange(f: UploadFile) {
   if (!f.raw) return
   if (f.raw.size > MAX_MB * 1024 * 1024) {
-    ElMessage.error(`图片不可以超过 ${MAX_MB}M（${f.name}）`)
+    toast.error(`图片不可以超过 ${MAX_MB}M（${f.name}）`)
     return
   }
   tasks.value.push({ uid: f.uid, file: f.raw, name: f.name, progress: 0, status: 'waiting' })
@@ -77,9 +81,18 @@ async function runOne(t: Task) {
     await uploadPhoto(props.albumId, t.file, (p) => (t.progress = p))
     t.progress = 100
     t.status = 'success'
-  } catch {
+  } catch (e) {
     t.status = 'error'
+    lastError = errorText(e)
   }
+}
+
+function errorText(e: unknown) {
+  if (isAxiosError(e)) {
+    if (e.response?.status === 413) return `图片超过 ${MAX_MB}M`
+    return e.response?.data?.msg || (e.response ? '服务器错误' : '网络错误')
+  }
+  return e instanceof Error ? e.message : ''
 }
 
 /** 简单的并发队列：最多 CONCURRENCY 个同时上传，失败的可以再点一次重试 */
@@ -87,6 +100,7 @@ async function start() {
   const queue = tasks.value.filter((t) => t.status === 'waiting' || t.status === 'error')
   if (!queue.length) return
   running.value = true
+  lastError = ''
   const worker = async () => {
     for (let t = queue.shift(); t; t = queue.shift()) await runOne(t)
   }
@@ -94,8 +108,8 @@ async function start() {
   running.value = false
 
   const failed = tasks.value.filter((t) => t.status === 'error').length
-  if (failed) ElMessage.warning(`${failed} 张上传失败，可点击「开始上传」重试`)
-  else ElMessage.success('全部上传完成')
+  if (failed) toast.warning(`${failed} 张上传失败${lastError ? `（${lastError}）` : ''}，可点击「开始上传」重试`)
+  else toast.success('全部上传完成')
   emit('done')
 }
 

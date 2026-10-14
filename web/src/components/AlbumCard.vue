@@ -22,24 +22,37 @@
 import { useRouter } from 'vue-router'
 import { likeAlbum, unlikeAlbum } from '@/api/album'
 import { useUserStore } from '@/stores/user'
+import { toast } from '@/utils/message'
 import type { Album } from '@/types'
 
 const props = defineProps<{ a: Album }>()
 const user = useUserStore()
 const router = useRouter()
 
+let pending = false
+
 /** 喜欢 / 取消喜欢，直接改 props 里的对象让列表同步 */
 async function toggle() {
-  if (!user.loggedIn) return router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
-  const a = props.a
-  if (a.liked) {
-    await unlikeAlbum(a.id)
-    a.likeCount = Math.max(0, a.likeCount - 1)
-  } else {
-    await likeAlbum(a.id)
-    a.likeCount++
+  if (!user.loggedIn) {
+    toast.info('请先登录')
+    return router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
   }
-  a.liked = !a.liked
+  if (pending) return
+  pending = true
+  const a = props.a
+  try {
+    if (a.liked) {
+      await unlikeAlbum(a.id)
+      a.likeCount = Math.max(0, a.likeCount - 1)
+    } else {
+      await likeAlbum(a.id)
+      a.likeCount++
+    }
+    a.liked = !a.liked
+    toast.success(a.liked ? '已喜欢' : '已取消喜欢')
+  } finally {
+    pending = false
+  }
 }
 </script>
 

@@ -27,11 +27,13 @@
       <AlbumDialog v-model="editVisible" :album="album" @saved="(a) => (album = { ...album!, ...a })" />
     </template>
   </div>
+  <el-empty v-else-if="error" description="加载失败"><el-button round @click="loadAll">重试</el-button></el-empty>
+  <div v-else v-loading="true" style="height: 60vh" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { toast, confirm } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import PhotoGrid from '@/components/PhotoGrid.vue'
 import UploadDialog from '@/components/UploadDialog.vue'
@@ -50,6 +52,7 @@ const photos = ref<Photo[]>([])
 const page = ref(0)
 const total = ref(0)
 const loading = ref(false)
+const error = ref(false)
 const uploadVisible = ref(false)
 const editVisible = ref(false)
 /** 本人或管理员可以管理 */
@@ -72,22 +75,36 @@ async function loadPhotos(reset = false) {
 }
 
 async function loadAll() {
-  album.value = await getAlbum(Number(props.id))
+  album.value = null
+  error.value = false
+  try {
+    album.value = await getAlbum(Number(props.id))
+  } catch {
+    error.value = true
+    return
+  }
   await loadPhotos(true)
 }
 
 async function onDelete(p: Photo) {
-  const ok = await ElMessageBox.confirm('确定删除这张照片？', '提示', { type: 'warning' }).catch(() => false)
+  const ok = await confirm('确定删除这张照片？')
   if (!ok) return
   await deletePhoto(p.id)
   photos.value = photos.value.filter((x) => x.id !== p.id)
   total.value--
-  ElMessage.success('已删除')
+  toast.success('已删除')
 }
 
+let settingCover = false
 async function onCover(p: Photo) {
-  await setAlbumCover(Number(props.id), p.id)
-  ElMessage.success('已设为封面')
+  if (settingCover) return
+  settingCover = true
+  try {
+    await setAlbumCover(Number(props.id), p.id)
+    toast.success('已设为封面')
+  } finally {
+    settingCover = false
+  }
 }
 
 watch(() => props.id, loadAll, { immediate: true })

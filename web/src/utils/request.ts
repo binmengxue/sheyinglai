@@ -1,6 +1,13 @@
 import axios, { type AxiosRequestConfig } from 'axios'
-import { ElMessage } from 'element-plus'
+import { toast } from '@/utils/message'
 import type { Result } from '@/types'
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /** 失败时不弹错误提示，由调用方自己处理（后台轮询、批量上传等） */
+    silent?: boolean
+  }
+}
 
 const TOKEN_KEY = 'photo_token'
 export const getToken = () => localStorage.getItem(TOKEN_KEY) || ''
@@ -10,6 +17,9 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
 // 前后端同域，接口统一走 /api（开发时由 Vite 代理，线上由 Nginx 转发）
 // `pnpm dev:test` 时通过 .env.test 把 VITE_API_BASE 设为 /api-dev，直连测试环境
 const http = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '/api', timeout: 15000 })
+
+/** 并发请求同时 401 时只提示、跳转一次 */
+let redirecting = false
 
 http.interceptors.request.use((config) => {
   const token = getToken()
@@ -21,21 +31,29 @@ http.interceptors.response.use(
   (res) => {
     const body = res.data as Result<unknown>
     if (body.code !== 0) {
-      ElMessage.error(body.msg || '请求失败')
+      if (!res.config.silent) toast.error(body.msg || '请求失败')
       return Promise.reject(new Error(body.msg))
     }
     return res
   },
   (err) => {
+    const silent = err.config?.silent
     if (err.response?.status === 401) {
       clearToken()
-      ElMessage.warning('登录已过期，请重新登录')
-      location.href = '/login?redirect=' + encodeURIComponent(location.pathname)
+      if (!silent && !redirecting) {
+        redirecting = true
+        toast.warning('登录已过期，请重新登录')
+        location.href = '/login?redirect=' + encodeURIComponent(location.pathname)
+      }
+    } else if (silent) {
+      // 调用方自己处理
     } else if (err.response?.status === 413) {
       // Nginx 超限时返回的是 HTML，没有 msg
-      ElMessage.error('图片不可以超过 1M')
+      toast.error('图片不可以超过 1M')
+    } else if (err.code === 'ECONNABORTED') {
+      toast.error('请求超时，请稍后重试')
     } else {
-      ElMessage.error(err.response?.data?.msg || err.message || '网络错误')
+      toast.error(err.response?.data?.msg || (err.response ? '请求失败' : '网络错误，请检查网络连接'))
     }
     return Promise.reject(err)
   },

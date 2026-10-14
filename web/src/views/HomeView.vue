@@ -19,6 +19,7 @@
       <PhotographerCard v-for="c in list" :key="c.id" :c="c" />
     </div>
     <div v-if="loading" v-loading="true" class="loading" />
+    <el-empty v-else-if="error && !list.length" description="加载失败"><el-button round @click="load(true)">重试</el-button></el-empty>
     <el-empty v-else-if="!list.length" description="附近还没有摄影师，快来成为第一个吧">
       <el-button class="cta" round @click="$router.push('/studio/profile')">我是摄影师，去入驻</el-button>
     </el-empty>
@@ -40,6 +41,7 @@ import { onMounted, ref } from 'vue'
 import PhotographerCard from '@/components/PhotographerCard.vue'
 import { listPhotographers, type SortKey } from '@/api/photographer'
 import { getLocation, STYLES } from '@/utils/format'
+import { toast } from '@/utils/message'
 import type { PhotographerCard as Card } from '@/types'
 
 const PAGE_SIZE = 10
@@ -54,6 +56,7 @@ const list = ref<Card[]>([])
 const total = ref(0)
 const page = ref(0)
 const loading = ref(false)
+const error = ref(false)
 const style = ref('')
 const sort = ref<SortKey>('default')
 let loc: { lat: number; lng: number } | null = null
@@ -64,6 +67,7 @@ async function load(reset = false) {
     page.value = 0
   }
   loading.value = true
+  error.value = false
   try {
     const res = await listPhotographers({
       style: style.value || undefined, sort: sort.value, ...(loc ?? {}), page: page.value + 1, size: PAGE_SIZE,
@@ -71,6 +75,8 @@ async function load(reset = false) {
     list.value.push(...res.records)
     total.value = res.total
     page.value++
+  } catch {
+    error.value = true
   } finally {
     loading.value = false
   }
@@ -83,7 +89,10 @@ function setStyle(s: string) {
 
 async function setSort(s: SortKey) {
   sort.value = s
-  if (s === 'distance' && !loc) loc = await getLocation()
+  if (s === 'distance' && !loc) {
+    loc = await getLocation()
+    if (!loc) toast.info('未获取到定位，暂时无法按距离排序，请检查浏览器定位权限')
+  }
   load(true)
 }
 

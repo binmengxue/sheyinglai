@@ -45,7 +45,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { toast } from '@/utils/message'
 import { createBooking } from '@/api/booking'
 import { useUserStore } from '@/stores/user'
 import { addHours, fmtDay, hm, toMinutes } from '@/utils/format'
@@ -110,7 +111,7 @@ async function submit() {
   saving.value = true
   try {
     await createBooking({ photographerId: props.p.userId, shootDate: props.date, ...form, style: form.style || undefined })
-    ElMessage.success('预约已提交，等待摄影师确认')
+    toast.success('预约已提交，等待摄影师确认')
     visible.value = false
     router.push('/orders')
   } finally {

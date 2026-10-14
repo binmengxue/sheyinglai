@@ -11,6 +11,7 @@
       <el-menu-item v-for="m in items" :key="m.to" :index="m.to">
         <el-icon><component :is="m.icon" /></el-icon>
         <span>{{ m.label }}</span>
+        <el-badge v-if="m.to === '/messages' && notification.unread" :value="notification.unread" :max="99" class="count" />
       </el-menu-item>
     </el-menu>
   </nav>
@@ -20,8 +21,10 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
 
 const user = useUserStore()
+const notification = useNotificationStore()
 const route = useRoute()
 
 const items = computed(() => {
@@ -29,6 +32,7 @@ const items = computed(() => {
   return [
     { to: '/me', label: '个人中心', icon: 'House' },
     { to: '/orders', label: '我的订单', icon: 'Tickets' },
+    { to: '/messages', label: '消息', icon: 'Bell' },
     { to: '/studio/albums', label: '我的客片', icon: 'Picture' },
     { to: '/studio/profile', label: '接单设置', icon: 'Setting' },
     { to: `/p/${id}/schedule`, label: '我的档期', icon: 'Calendar' },
@@ -48,6 +52,7 @@ const active = computed(() => (route.path === '/me/edit' ? '/me' : route.path))
 .info { min-width: 0; }
 .name { font-weight: 700; }
 .el-menu { border-right: none; --el-menu-item-height: 44px; }
+.count { margin-left: auto; display: flex; }
 .el-menu-item { border-radius: 10px; margin: 2px 0; }
 .el-menu-item.is-active { background: var(--brand-soft); color: var(--text); font-weight: 700; }
 .el-menu-item.is-active::before { content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--brand-strong); }

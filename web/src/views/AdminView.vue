@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { toast, confirm } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import { adminUsers, setBanned, setPhotographerVisible } from '@/api/admin'
 import { fmtDateTime } from '@/utils/format'
@@ -117,19 +117,20 @@ async function load(reset = false) {
 
 async function toggleBan(v: AdminUserView) {
   const ban = v.user.status !== 'BANNED'
-  const ok = await ElMessageBox.confirm(ban ? `封禁「${v.user.nickname}」？封禁后无法登录，主页和客片对外隐藏` : `解封「${v.user.nickname}」？`, '确认', { type: 'warning' })
-    .catch(() => false)
+  const ok = await confirm(ban ? `封禁「${v.user.nickname}」？封禁后无法登录，主页和客片对外隐藏` : `解封「${v.user.nickname}」？`)
   if (!ok) return
   await setBanned(v.user.id, ban)
   v.user.status = ban ? 'BANNED' : 'NORMAL'
-  ElMessage.success('已更新')
+  toast.success(ban ? '已封禁' : '已解封')
 }
 
 async function toggleVisible(v: AdminUserView) {
   const p = v.photographer!
+  const ok = await confirm(p.visible ? `把「${v.user.nickname}」从首页隐藏？` : `在首页恢复展示「${v.user.nickname}」？`)
+  if (!ok) return
   await setPhotographerVisible(v.user.id, !p.visible)
   p.visible = !p.visible
-  ElMessage.success(p.visible ? '已在首页恢复展示' : '已从首页隐藏')
+  toast.success(p.visible ? '已在首页恢复展示' : '已从首页隐藏')
 }
 
 onMounted(() => load(true))

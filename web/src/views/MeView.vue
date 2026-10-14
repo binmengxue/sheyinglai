@@ -31,6 +31,13 @@
 
       <!-- PC 上左侧菜单已有这些入口 -->
       <div class="entries mobile-only">
+        <RouterLink to="/messages" class="entry">
+          <b>
+            <el-icon><Bell /></el-icon> 消息
+            <el-badge v-if="notification.unread" :value="notification.unread" :max="99" class="count" />
+          </b>
+          <span>预约、评价、关注通知</span>
+        </RouterLink>
         <RouterLink to="/studio/profile" class="entry">
           <b><el-icon><Camera /></el-icon> {{ user.isPhotographerReady ? '接单设置' : '我要接单' }}</b>
           <span>{{ user.isPhotographerReady ? '收费、档期、规则' : '设置价格后出现在首页' }}</span>
@@ -70,7 +77,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, type UploadFile } from 'element-plus'
+import { type UploadFile } from 'element-plus'
+import { confirm, toast } from '@/utils/message'
 import AlbumCard from '@/components/AlbumCard.vue'
 import ReviewItem from '@/components/ReviewItem.vue'
 import { myLikes } from '@/api/album'
@@ -78,10 +86,12 @@ import { myReviews } from '@/api/booking'
 import { uploadAvatar } from '@/api/auth'
 import { getPhotographer } from '@/api/photographer'
 import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
 import { genderMark } from '@/utils/format'
 import type { Album, ReviewView } from '@/types'
 
 const user = useUserStore()
+const notification = useNotificationStore()
 const router = useRouter()
 const u = computed(() => user.user)
 
@@ -94,26 +104,33 @@ const reviewTotal = ref(0)
 
 async function onAvatar(f: UploadFile) {
   if (!f.raw) return
-  if (f.raw.size > 1024 * 1024) return void ElMessage.error('图片不可以超过 1M')
+  if (f.raw.size > 1024 * 1024) return void toast.error('图片不可以超过 1M')
   user.setUser(await uploadAvatar(f.raw))
-  ElMessage.success('头像已更新')
+  toast.success('头像已更新')
 }
 
 async function onMore(cmd: string) {
   if (cmd === 'logout') {
+    if (!(await confirm('确定退出登录？', { type: 'info' }))) return
     await user.logout()
+    toast.success('已退出登录')
     router.replace('/')
   }
 }
 
 onMounted(async () => {
   const id = u.value!.id
-  const [d, l, r] = await Promise.all([getPhotographer(id, null, false), myLikes(), myReviews()])
-  fans.value = d.fans
-  following.value = d.following
-  likes.value = l
-  reviews.value = r.records
-  reviewTotal.value = r.total
+  // 各块独立加载，一块失败不影响其它（错误已由请求拦截器提示）
+  const [d, l, r] = await Promise.allSettled([getPhotographer(id, null, false), myLikes(), myReviews()])
+  if (d.status === 'fulfilled') {
+    fans.value = d.value.fans
+    following.value = d.value.following
+  }
+  if (l.status === 'fulfilled') likes.value = l.value
+  if (r.status === 'fulfilled') {
+    reviews.value = r.value.records
+    reviewTotal.value = r.value.total
+  }
 })
 </script>
 
@@ -138,6 +155,7 @@ h1 { margin: 0; font-size: 24px; }
 .entry { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.1); }
 .entry b { display: flex; align-items: center; gap: 4px; font-size: 15px; }
 .entry span { font-size: 12px; opacity: 0.6; }
+.entry .count { margin-left: 4px; display: flex; }
 .sheet { position: relative; margin-top: -20px; min-height: 40vh; padding: 4px 12px 20px; background: #fff; border-radius: 20px 20px 0 0; }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 

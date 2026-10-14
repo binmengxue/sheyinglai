@@ -17,14 +17,22 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import StudioMenu from '@/components/StudioMenu.vue'
 import { useDevice } from '@/composables/useDevice'
+import { useUserStore } from '@/stores/user'
+import { useNotificationStore } from '@/stores/notification'
 
 const route = useRoute()
 const { isDesktop } = useDevice()
+
+// 登录后开始轮询未读消息，退出后停止
+const user = useUserStore()
+const notification = useNotificationStore()
+watch(() => user.loggedIn, (on) => (on ? notification.start() : notification.stop()), { immediate: true })
 </script>
 
 <style lang="scss" scoped>

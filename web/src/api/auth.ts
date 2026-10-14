@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios'
 import { request } from '@/utils/request'
 import type { Me, User } from '@/types'
 
@@ -9,9 +10,9 @@ export const login = (phone: string, password: string) =>
 export const register = (data: { phone: string; password: string; nickname?: string; agree: boolean }) =>
   request<LoginResult>({ url: '/auth/register', method: 'post', data })
 
-export const me = () => request<Me>({ url: '/auth/me' })
+export const me = (config?: AxiosRequestConfig) => request<Me>({ url: '/auth/me', ...config })
 
-export const logout = () => request<void>({ url: '/auth/logout', method: 'post' })
+export const logout = (config?: AxiosRequestConfig) => request<void>({ url: '/auth/logout', method: 'post', ...config })
 
 export const updateProfile = (data: Pick<User, 'nickname' | 'gender' | 'bio' | 'city' | 'wechat'>) =>
   request<User>({ url: '/users/me', method: 'put', data })

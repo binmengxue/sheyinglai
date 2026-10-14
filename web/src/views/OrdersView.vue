@@ -41,16 +41,16 @@
           <span class="muted">{{ fmtDateTime(v.booking.createdAt) }} 提交</span>
           <template v-if="role === 'photographer'">
             <template v-if="v.booking.status === 'PENDING'">
-              <el-button round size="small" @click="act(v, 'reject')">拒绝</el-button>
-              <el-button round size="small" class="cta" @click="act(v, 'confirm')">确认接单</el-button>
+              <el-button round size="small" :loading="acting === v.booking.id" @click="act(v, 'reject')">拒绝</el-button>
+              <el-button round size="small" class="cta" :loading="acting === v.booking.id" @click="act(v, 'confirm')">确认接单</el-button>
             </template>
             <template v-else-if="v.booking.status === 'CONFIRMED'">
-              <el-button round size="small" @click="act(v, 'cancel')">取消</el-button>
-              <el-button round size="small" class="cta" :disabled="v.booking.shootDate > today" @click="act(v, 'complete')">拍摄完成</el-button>
+              <el-button round size="small" :loading="acting === v.booking.id" @click="act(v, 'cancel')">取消</el-button>
+              <el-button round size="small" class="cta" :disabled="v.booking.shootDate > today" :loading="acting === v.booking.id" @click="act(v, 'complete')">拍摄完成</el-button>
             </template>
           </template>
           <template v-else>
-            <el-button v-if="['PENDING', 'CONFIRMED'].includes(v.booking.status)" round size="small" @click="act(v, 'cancel')">取消预约</el-button>
+            <el-button v-if="['PENDING', 'CONFIRMED'].includes(v.booking.status)" round size="small" :loading="acting === v.booking.id" @click="act(v, 'cancel')">取消预约</el-button>
             <el-button v-if="v.booking.status === 'COMPLETED' && !v.booking.reviewed" round size="small" class="cta" @click="openReview(v)">去评价</el-button>
             <span v-if="v.booking.reviewed" class="muted">已评价</span>
           </template>
@@ -58,6 +58,7 @@
       </div>
     </div>
     <div v-if="loading" v-loading="true" style="height: 120px" />
+    <el-empty v-else-if="error && !list.length" description="加载失败"><el-button round @click="load(true)">重试</el-button></el-empty>
     <el-empty v-else-if="!list.length" :description="role === 'customer' ? '还没有预约，去首页找个摄影师吧' : '还没有人约你，完善资料和客片会更容易被约哦'" />
     <div v-else-if="list.length < total" class="more"><el-button round @click="load()">加载更多</el-button></div>
 
@@ -73,9 +74,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { toast, confirm } from '@/utils/message'
 import { bookingAction, listBookings, reviewBooking, type BookingAction } from '@/api/booking'
 import { addHours, BOOKING_STATUS, fmtDateTime, fmtDay, hm, ymd } from '@/utils/format'
 import type { BookingStatus, BookingView } from '@/types'
@@ -91,6 +92,7 @@ const status = ref<BookingStatus>()
 const list = ref<BookingView[]>([])
 const total = ref(0)
 const loading = ref(false)
+const error = ref(false)
 let page = 0
 
 const other = (v: BookingView) => (role.value === 'customer' ? v.photographer : v.customer)
@@ -113,11 +115,14 @@ async function load(reset = false) {
     page = 0
   }
   loading.value = true
+  error.value = false
   try {
     const res = await listBookings({ role: role.value, status: status.value, page: page + 1, size: PAGE_SIZE })
     list.value.push(...res.records)
     total.value = res.total
     page++
+  } catch {
+    error.value = true
   } finally {
     loading.value = false
   }
@@ -141,13 +146,28 @@ const ACTION_TEXT: Record<BookingAction, string> = {
   complete: '确认已完成拍摄？完成后客户可以评价',
 }
 
+const ACTION_DONE: Record<BookingAction, string> = {
+  confirm: '已接单，客户会收到通知',
+  reject: '已拒绝该预约',
+  cancel: '预约已取消',
+  complete: '已标记拍摄完成',
+}
+
+/** 正在处理的订单 id，按钮显示 loading，防止重复点击 */
+const acting = ref<number>()
+
 async function act(v: BookingView, action: BookingAction) {
-  const ok = await ElMessageBox.confirm(ACTION_TEXT[action], '提示', { type: action === 'confirm' || action === 'complete' ? 'info' : 'warning' })
-    .catch(() => false)
+  if (acting.value) return
+  const ok = await confirm(ACTION_TEXT[action], { type: action === 'confirm' || action === 'complete' ? 'info' : 'warning' })
   if (!ok) return
-  const fresh = await bookingAction(v.booking.id, action)
-  Object.assign(v, fresh)
-  ElMessage.success('操作成功')
+  acting.value = v.booking.id
+  try {
+    const fresh = await bookingAction(v.booking.id, action)
+    Object.assign(v, fresh)
+    toast.success(ACTION_DONE[action])
+  } finally {
+    acting.value = undefined
+  }
 }
 
 const reviewVisible = ref(false)
@@ -169,13 +189,21 @@ async function submitReview() {
     await reviewBooking(reviewing.value!.booking.id, score.value, content.value || undefined)
     reviewing.value!.booking.reviewed = true
     reviewVisible.value = false
-    ElMessage.success('感谢你的评价')
+    toast.success('感谢你的评价')
   } finally {
     saving.value = false
   }
 }
 
 onMounted(() => load(true))
+
+// 从消息跳过来（/orders?role=xxx）时已在订单页，也要切到对应 tab
+watch(() => route.query.role, (r) => {
+  const next: Role = r === 'photographer' ? 'photographer' : 'customer'
+  if (next === role.value) return
+  role.value = next
+  load(true)
+})
 </script>
 
 <style lang="scss" scoped>

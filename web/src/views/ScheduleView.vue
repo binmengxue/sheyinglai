@@ -46,7 +46,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { toast, confirm } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import PhotographerCard from '@/components/PhotographerCard.vue'
 import BookingDialog from '@/components/BookingDialog.vue'
@@ -102,23 +102,25 @@ async function pick(day: DayInfo) {
   if (day.status === 'EXPIRED') return
   if (self.value) {
     // 本人：切换休息。约满的天说明有已确认预约，不能整天设为休息
-    if (day.status === 'FULL') return void ElMessage.info('这天已约满，有已确认的预约')
+    if (day.status === 'FULL') return void toast.info('这天已约满，有已确认的预约')
     const off = day.status !== 'OFF'
-    const ok = await ElMessageBox.confirm(off ? `把 ${fmtDay(day.date)} 设为休息？` : `取消 ${fmtDay(day.date)} 的休息？`, '档期设置')
-      .catch(() => false)
+    const ok = await confirm(off ? `把 ${fmtDay(day.date)} 设为休息？` : `取消 ${fmtDay(day.date)} 的休息？`, { title: '档期设置', type: 'info' })
     if (!ok) return
     await setDayOff(day.date, off)
-    ElMessage.success('已更新')
+    toast.success(off ? '已设为休息' : '已取消休息')
     await loadSchedule()
     // 按接单规则本来就不接单的星期，取消休息后仍是休息
     const now = schedule.value?.days.find((d) => d.date === day.date)
-    if (!off && now?.status === 'OFF') ElMessage.info('这天不在你的可接单日内，可到「接单设置」修改')
+    if (!off && now?.status === 'OFF') toast.info('这天不在你的可接单日内，可到「接单设置」修改')
   }
   selected.value = day.date
 }
 
 function book() {
-  if (!user.loggedIn) return router.push({ path: '/login', query: { redirect: `/p/${props.id}/schedule` } })
+  if (!user.loggedIn) {
+    toast.info('请先登录')
+    return router.push({ path: '/login', query: { redirect: `/p/${props.id}/schedule` } })
+  }
   bookingVisible.value = true
 }
 

@@ -19,7 +19,8 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { toast } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import { useUserStore } from '@/stores/user'
 
@@ -40,7 +41,7 @@ async function submit() {
   loading.value = true
   try {
     await user.login(form.phone, form.password)
-    ElMessage.success('登录成功')
+    toast.success('登录成功')
     router.replace((route.query.redirect as string) || '/me')
   } finally {
     loading.value = false

@@ -40,6 +40,7 @@
       </div>
       <p class="muted note">曝光：出现在首页列表的次数；咨询：收到的预约数。成交率 = 已完成 / 全部预约，接单率 = 确认 / (确认 + 拒绝)。</p>
     </div>
+    <el-empty v-else-if="error" description="加载失败"><el-button round @click="load">重试</el-button></el-empty>
     <div v-else v-loading="true" style="height: 50vh" />
   </div>
 </template>
@@ -51,6 +52,7 @@ import { myStats } from '@/api/booking'
 import type { StatsView } from '@/types'
 
 const s = ref<StatsView | null>(null)
+const error = ref(false)
 const yesterday = computed(() => s.value ? [
   { label: '曝光量', v: s.value.exposure },
   { label: '主页浏览量', v: s.value.profileView },
@@ -68,7 +70,16 @@ function reply(m?: number) {
   return `${Math.round(m / 60 / 24)}天`
 }
 
-onMounted(async () => { s.value = await myStats() })
+async function load() {
+  error.value = false
+  try {
+    s.value = await myStats()
+  } catch {
+    error.value = true
+  }
+}
+
+onMounted(load)
 </script>
 
 <style lang="scss" scoped>

@@ -259,3 +259,15 @@ export interface AdminUserView {
   user: User
   photographer?: Photographer
 }
+
+/** 站内消息 */
+export interface Notification {
+  id: number
+  type: 'BOOKING' | 'REVIEW' | 'FOLLOW'
+  title: string
+  content?: string
+  /** 点击后跳转的路由 */
+  link?: string
+  isRead: boolean
+  createdAt: string
+}

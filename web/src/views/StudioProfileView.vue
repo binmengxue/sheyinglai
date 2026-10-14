@@ -116,7 +116,8 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { type FormInstance, type FormRules } from 'element-plus'
+import { toast } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import { updateMyPhotographer } from '@/api/photographer'
 import { useUserStore } from '@/stores/user'
@@ -158,18 +159,18 @@ const form = reactive<PhotographerForm>({
 const rules: FormRules = { pricePerHour: [{ required: true, message: '请填写每小时价格' }] }
 
 function locate() {
-  if (!navigator.geolocation) return void ElMessage.error('当前浏览器不支持定位')
+  if (!navigator.geolocation) return void toast.error('当前浏览器不支持定位')
   locating.value = true
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       form.lat = pos.coords.latitude
       form.lng = pos.coords.longitude
       locating.value = false
-      ElMessage.success('已获取当前位置')
+      toast.success('已获取当前位置')
     },
     () => {
       locating.value = false
-      ElMessage.error('定位失败，请检查浏览器的定位权限')
+      toast.error('定位失败，请检查浏览器的定位权限')
     },
     { timeout: 8000 },
   )
@@ -177,11 +178,11 @@ function locate() {
 
 async function save() {
   await formRef.value?.validate()
-  if (form.workEnd <= form.workStart) return void ElMessage.error('结束时间要晚于开始时间')
+  if (form.workEnd <= form.workStart) return void toast.error('结束时间要晚于开始时间')
   saving.value = true
   try {
     user.setPhotographer(await updateMyPhotographer(form))
-    ElMessage.success('已保存')
+    toast.success('已保存')
     router.push(`/p/${p.userId}`)
   } finally {
     saving.value = false

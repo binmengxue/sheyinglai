@@ -7,6 +7,7 @@ export const listPhotos = (params: { albumId: number; page?: number; size?: numb
 export const deletePhoto = (id: number) => request<void>({ url: `/photos/${id}`, method: 'delete' })
 
 /** 上传单张图片，onProgress 回传 0-100 */
+/** 批量上传时逐张调用，失败不单独弹提示，由上传弹窗汇总 */
 export function uploadPhoto(albumId: number, file: File, onProgress?: (p: number) => void) {
   const form = new FormData()
   form.append('albumId', String(albumId))
@@ -16,6 +17,7 @@ export function uploadPhoto(albumId: number, file: File, onProgress?: (p: number
     method: 'post',
     data: form,
     timeout: 5 * 60 * 1000,
+    silent: true,
     onUploadProgress: (e) => e.total && onProgress?.(Math.round((e.loaded / e.total) * 100)),
   })
 }
