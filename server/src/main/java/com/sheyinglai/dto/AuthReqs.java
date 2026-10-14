@@ -14,6 +14,9 @@ public final class AuthReqs {
     }
 
     public static final String PHONE_REGEX = "^1\\d{10}$";
+    /** 新密码：8~32 位，同时包含字母和数字（登录不校验，老用户的短密码仍能登录） */
+    public static final String PASSWORD_REGEX = "^(?=.*[A-Za-z])(?=.*\\d).{8,32}$";
+    public static final String PASSWORD_MSG = "密码 8~32 位，需同时包含字母和数字";
 
     public record LoginReq(
             @NotBlank @Pattern(regexp = PHONE_REGEX, message = "手机号格式不正确") String phone,
@@ -22,7 +25,7 @@ public final class AuthReqs {
 
     public record RegisterReq(
             @NotBlank @Pattern(regexp = PHONE_REGEX, message = "手机号格式不正确") String phone,
-            @NotBlank @Size(min = 6, max = 32, message = "密码长度 6~32 位") String password,
+            @NotBlank @Pattern(regexp = PASSWORD_REGEX, message = PASSWORD_MSG) String password,
             @Size(max = 32) String nickname,
             @AssertTrue(message = "请先阅读并同意用户协议和隐私政策") boolean agree) {
     }
@@ -35,8 +38,11 @@ public final class AuthReqs {
             @Size(max = 64) String wechat) {
     }
 
+    public record DeleteAccountReq(String password) {
+    }
+
     public record PasswordReq(
             @NotBlank String oldPassword,
-            @NotBlank @Size(min = 6, max = 32, message = "密码长度 6~32 位") String newPassword) {
+            @NotBlank @Pattern(regexp = PASSWORD_REGEX, message = PASSWORD_MSG) String newPassword) {
     }
 }

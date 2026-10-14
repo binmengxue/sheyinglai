@@ -20,6 +20,8 @@ import com.sheyinglai.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -113,11 +115,26 @@ public class AlbumService {
     @Transactional
     public void delete(Long id) {
         getOwned(id);
-        List<Photo> photos = photoMapper.selectList(new LambdaQueryWrapper<Photo>().eq(Photo::getAlbumId, id));
-        photos.forEach(p -> storage.delete(p.getStorageKey()));
+        List<String> keys = photoMapper.selectList(new LambdaQueryWrapper<Photo>().eq(Photo::getAlbumId, id))
+                .stream().map(Photo::getStorageKey).toList();
+        afterCommit(() -> keys.forEach(storage::delete));
         photoMapper.delete(new LambdaQueryWrapper<Photo>().eq(Photo::getAlbumId, id));
         likeMapper.delete(new LambdaQueryWrapper<AlbumLike>().eq(AlbumLike::getAlbumId, id));
         albumMapper.deleteById(id);
+    }
+
+    /** 事务提交后再执行（删文件等不能回滚的操作）；不在事务里时立即执行 */
+    private static void afterCommit(Runnable task) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            task.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                task.run();
+            }
+        });
     }
 
     public void setCover(Long albumId, Long photoId) {

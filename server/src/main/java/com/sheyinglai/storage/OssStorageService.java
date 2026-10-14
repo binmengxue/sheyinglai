@@ -32,18 +32,18 @@ public class OssStorageService implements StorageService {
 
     @Override
     public StoredFile store(MultipartFile file) throws IOException {
-        String key = StorageService.newKey(file);
         byte[] bytes = file.getBytes();
+        ImageInfo info = StorageService.inspect(bytes);
+        String key = StorageService.newKey(info.ext());
         ObjectMetadata meta = new ObjectMetadata();
-        meta.setContentType(file.getContentType());
+        // 按识别出的格式设置，不信任客户端传来的 Content-Type
+        meta.setContentType(info.contentType());
         meta.setContentLength(bytes.length);
         client.putObject(cfg.getBucket(), key, new ByteArrayInputStream(bytes), meta);
 
         String url = trimSlash(cfg.getDomain()) + "/" + key;
         String thumbUrl = url + "?x-oss-process=image/resize,w_" + thumbWidth + "/quality,q_80/format,jpg";
-        int[] size = StorageService.readSize(bytes);
-        return new StoredFile(key, url, thumbUrl,
-                size == null ? null : size[0], size == null ? null : size[1], bytes.length);
+        return new StoredFile(key, url, thumbUrl, info.width(), info.height(), bytes.length);
     }
 
     @Override

@@ -30,20 +30,27 @@
         <el-input v-model="pwd.oldPassword" type="password" show-password />
       </el-form-item>
       <el-form-item label="新密码" prop="newPassword">
-        <el-input v-model="pwd.newPassword" type="password" show-password placeholder="6~32 位" />
+        <el-input v-model="pwd.newPassword" type="password" show-password placeholder="8~32 位，含字母和数字" />
       </el-form-item>
       <el-button class="block" round :loading="pwdSaving" @click="savePwd">修改密码</el-button>
     </el-form>
+
+    <div class="card danger">
+      <h3>注销账号</h3>
+      <p class="muted">注销后手机号、昵称、头像等个人信息会被清除，客片会被删除，且无法恢复；历史订单和评价会显示为「已注销用户」。有进行中的预约时不能注销。</p>
+      <el-button class="block" round type="danger" plain @click="removeAccount">注销账号</el-button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { type FormInstance, type FormRules } from 'element-plus'
-import { toast } from '@/utils/message'
+import type { FormInstance, FormRules } from 'element-plus'
+import { prompt, singleFlight, toast } from '@/utils/message'
+import { passwordRules } from '@/utils/validate'
 import NavBar from '@/components/NavBar.vue'
-import { changePassword, updateProfile } from '@/api/auth'
+import { changePassword, deleteAccount, updateProfile } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 
 const user = useUserStore()
@@ -56,7 +63,7 @@ const form = reactive({ nickname: u.nickname, gender: u.gender, city: u.city ?? 
 const rules: FormRules = { nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }] }
 
 async function save() {
-  await formRef.value?.validate()
+  if (!(await formRef.value?.validate().catch(() => false))) return
   saving.value = true
   try {
     user.setUser(await updateProfile(form))
@@ -72,11 +79,11 @@ const pwdSaving = ref(false)
 const pwd = reactive({ oldPassword: '', newPassword: '' })
 const pwdRules: FormRules = {
   oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
-  newPassword: [{ required: true, min: 6, max: 32, message: '密码长度 6~32 位', trigger: 'blur' }],
+  newPassword: passwordRules,
 }
 
 async function savePwd() {
-  await pwdRef.value?.validate()
+  if (!(await pwdRef.value?.validate().catch(() => false))) return
   pwdSaving.value = true
   try {
     await changePassword(pwd.oldPassword, pwd.newPassword)
@@ -87,11 +94,23 @@ async function savePwd() {
     pwdSaving.value = false
   }
 }
+
+const removeAccount = singleFlight(async () => {
+  const password = await prompt('注销后无法恢复。请输入登录密码确认：', { title: '注销账号', placeholder: '登录密码', confirmText: '确认注销', type: 'warning', inputType: 'password' })
+  if (password === null) return
+  if (!password) return void toast.error('请输入密码')
+  await deleteAccount(password)
+  await user.logout()
+  toast.success('账号已注销')
+  router.replace('/')
+})
 </script>
 
 <style lang="scss" scoped>
 h3 { margin: 0 0 12px; }
 .block { width: 100%; }
+.danger h3 { color: #e5483d; }
+.danger p { margin: 0 0 12px; line-height: 1.6; }
 @media (min-width: 768px) {
   .page { max-width: 880px; }
   .block { width: 200px; }

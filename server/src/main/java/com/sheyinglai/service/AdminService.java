@@ -47,6 +47,10 @@ public class AdminService {
         if (userId.equals(Auth.uid())) {
             throw new BizException("不能封禁自己");
         }
+        User u = userMapper.selectById(userId);
+        if (u != null && User.STATUS_DELETED.equals(u.getStatus())) {
+            throw new BizException("该账号已注销");
+        }
         userMapper.update(null, new LambdaUpdateWrapper<User>()
                 .set(User::getStatus, banned ? User.STATUS_BANNED : User.STATUS_NORMAL)
                 .eq(User::getId, userId));

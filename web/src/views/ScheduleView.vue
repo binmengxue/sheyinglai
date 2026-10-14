@@ -1,6 +1,8 @@
 <template>
-  <NavBar :fallback="`/p/${id}`" />
+  <NavBar :title="rescheduling ? '选择新的拍摄时间' : undefined" :fallback="rescheduling ? `/orders/${rescheduling.id}` : `/p/${id}`" />
   <div class="page layout">
+    <el-alert v-if="rescheduling" class="resched" type="warning" :closable="false" show-icon
+      :title="`正在为 ${fmtDay(rescheduling.shootDate)} 的预约改期，选择新的日期和时段后点「改到这天」`" />
     <div v-if="detail" class="head">
       <PhotographerCard :c="detail.card" compact />
       <RouterLink :to="`/p/${id}`" class="to-home">点击去主页看客片</RouterLink>
@@ -8,9 +10,9 @@
 
     <div class="card cal">
       <div class="month">
-        <button class="nav" :disabled="!canPrev" @click="shift(-1)"><el-icon><ArrowLeft /></el-icon></button>
+        <button class="nav" aria-label="上个月" :disabled="!canPrev" @click="shift(-1)"><el-icon><ArrowLeft /></el-icon></button>
         <h2>{{ month.replace('-', '年') }}月</h2>
-        <button class="nav" :disabled="!canNext" @click="shift(1)"><el-icon><ArrowRight /></el-icon></button>
+        <button class="nav" aria-label="下个月" :disabled="!canNext" @click="shift(1)"><el-icon><ArrowRight /></el-icon></button>
       </div>
       <div class="week"><span v-for="w in WEEK" :key="w">{{ w }}</span></div>
       <div v-loading="loading" class="days">
@@ -32,7 +34,7 @@
         <div v-for="s in selectedDay.free" :key="s.start" class="slot">
           <div class="time"><b>{{ hm(s.start) }}</b><b>{{ hm(s.end) }}</b></div>
           <span class="dot" /> 可约
-          <el-button v-if="!self" class="cta right" round @click="book">预约</el-button>
+          <el-button v-if="!self" class="cta right" round @click="book">{{ rescheduling ? '改到这天' : '预约' }}</el-button>
         </div>
         <p class="muted">{{ schedule?.minHours }}小时起拍，开始时间可选整点或半点</p>
       </template>
@@ -40,24 +42,29 @@
     </div>
   </div>
 
-  <BookingDialog v-if="detail && selectedDay" v-model="bookingVisible" :p="detail.profile" :date="selectedDay.date" :slots="selectedDay.free" />
+  <BookingDialog v-if="detail && selectedDay" v-model="bookingVisible" :p="detail.profile" :date="selectedDay.date"
+    :slots="selectedDay.free" :reschedule="rescheduling ?? undefined" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { toast, confirm } from '@/utils/message'
+import { useRoute, useRouter } from 'vue-router'
+import { toast, confirm, singleFlight } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import PhotographerCard from '@/components/PhotographerCard.vue'
 import BookingDialog from '@/components/BookingDialog.vue'
 import { getPhotographer, getSchedule, setDayOff } from '@/api/photographer'
+import { getBooking } from '@/api/booking'
 import { useUserStore } from '@/stores/user'
-import { DAY_STATUS, fmtDay, getLocation, hm, ymd } from '@/utils/format'
-import type { DayInfo, PhotographerDetail, ScheduleView } from '@/types'
+import { DAY_STATUS, fmtDay, hm, peekLocation, ymd } from '@/utils/format'
+import type { Booking, DayInfo, PhotographerDetail, ScheduleView } from '@/types'
 
 const props = defineProps<{ id: string }>()
 const user = useUserStore()
 const router = useRouter()
+const route = useRoute()
+/** 从订单「改期」进来时，要改期的预约 */
+const rescheduling = ref<Booking | null>(null)
 
 const WEEK = ['日', '一', '二', '三', '四', '五', '六']
 /** 最多看到 3 个月后（后端最多允许预约 90 天内） */
@@ -98,7 +105,7 @@ async function loadSchedule() {
   }
 }
 
-async function pick(day: DayInfo) {
+const pick = singleFlight(async (day: DayInfo) => {
   if (day.status === 'EXPIRED') return
   if (self.value) {
     // 本人：切换休息。约满的天说明有已确认预约，不能整天设为休息
@@ -114,7 +121,7 @@ async function pick(day: DayInfo) {
     if (!off && now?.status === 'OFF') toast.info('这天不在你的可接单日内，可到「接单设置」修改')
   }
   selected.value = day.date
-}
+})
 
 function book() {
   if (!user.loggedIn) {
@@ -125,12 +132,16 @@ function book() {
 }
 
 watch(() => props.id, async (id) => {
-  detail.value = await getPhotographer(Number(id), await getLocation(), false)
+  detail.value = await getPhotographer(Number(id), peekLocation() ?? null, false)
 }, { immediate: true })
 watch([() => props.id, month], loadSchedule, { immediate: true })
+watch(() => route.query.reschedule, async (id) => {
+  rescheduling.value = id ? (await getBooking(Number(id)).catch(() => null))?.booking ?? null : null
+}, { immediate: true })
 </script>
 
 <style lang="scss" scoped>
+.resched { margin-bottom: 12px; }
 .head { background: #fff; border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; }
 .to-home { display: block; padding: 10px; text-align: center; font-size: 13px; color: #555; border-top: 1px solid #f2f2f2; }
 .month { display: flex; align-items: center; justify-content: space-between; }

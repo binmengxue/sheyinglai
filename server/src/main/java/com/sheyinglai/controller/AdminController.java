@@ -6,9 +6,12 @@ import com.sheyinglai.common.Result;
 import com.sheyinglai.dto.Views;
 import com.sheyinglai.entity.User;
 import com.sheyinglai.service.AdminService;
+import com.sheyinglai.service.ReportService;
 import com.sheyinglai.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 /** 管理员：用户列表、封禁、隐藏摄影师、删除评价。删除客片直接用 DELETE /albums/{id}（管理员不受归属限制） */
 @SaCheckRole(User.ROLE_ADMIN)
@@ -19,6 +22,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final ReviewService reviewService;
+    private final ReportService reportService;
 
     @GetMapping("/users")
     public Result<PageResult<Views.AdminUserView>> users(@RequestParam(required = false) String keyword,
@@ -36,6 +40,20 @@ public class AdminController {
     @PutMapping("/photographers/{id}/visible")
     public Result<Void> visible(@PathVariable Long id, @RequestParam boolean value) {
         adminService.setVisible(id, value);
+        return Result.ok();
+    }
+
+    /** 举报列表，status 可选：PENDING / HANDLED / IGNORED */
+    @GetMapping("/reports")
+    public Result<PageResult<Views.ReportView>> reports(@RequestParam(required = false) String status,
+                                                        @RequestParam(defaultValue = "1") long page,
+                                                        @RequestParam(defaultValue = "20") long size) {
+        return Result.ok(reportService.list(status, page, size));
+    }
+
+    @PostMapping("/reports/{id}/handle")
+    public Result<Void> handleReport(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        reportService.handle(id, body.get("status"), body.get("note"));
         return Result.ok();
     }
 

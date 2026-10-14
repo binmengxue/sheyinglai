@@ -4,7 +4,7 @@
   --bg: #f6f7f9;
   --card: #fff;
   --text: #1a1a1a;
-  --text-muted: #8a8f98;
+  --text-muted: #6b7079; /* 白底对比度约 4.9:1，满足可读性要求 */
   --brand: #ffe14d;
   --brand-strong: #ffd400;
   --brand-soft: #fff6c7;
@@ -79,3 +79,10 @@ img { display: block; }
   .page { padding: 0 0 32px; }
   .chips { flex-wrap: wrap; overflow: visible; }
 }
+
+/* 手机上输入框字号小于 16px 时，iOS 聚焦会自动放大页面 */
+@media (max-width: 767px) {
+  .el-input__inner, .el-textarea__inner { font-size: 16px; }
+}
+/* 键盘操作时显示焦点框（全局去掉了点击高亮） */
+:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }

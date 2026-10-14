@@ -33,8 +33,9 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public StoredFile store(MultipartFile file) throws IOException {
-        String key = StorageService.newKey(file);
         byte[] bytes = file.getBytes();
+        ImageInfo info = StorageService.inspect(bytes);
+        String key = StorageService.newKey(info.ext());
         Path target = root.resolve(key);
         Files.createDirectories(target.getParent());
         Files.write(target, bytes);
@@ -42,18 +43,19 @@ public class LocalStorageService implements StorageService {
         String url = urlPrefix + key;
         String thumbUrl = url;
         String thumbKey = thumbKey(key);
-        try {
-            Thumbnails.of(new ByteArrayInputStream(bytes))
-                    .width(thumbWidth).addFilter(LocalStorageService::onWhite).outputFormat("jpg").outputQuality(0.8)
-                    .toFile(root.resolve(thumbKey).toFile());
-            thumbUrl = urlPrefix + thumbKey;
-        } catch (Exception e) {
-            log.warn("缩略图生成失败，使用原图：{}", key);
+        // 读不出尺寸的图片（部分 webp）不解码，直接用原图
+        if (info.decodable()) {
+            try {
+                Thumbnails.of(new ByteArrayInputStream(bytes))
+                        .width(thumbWidth).addFilter(LocalStorageService::onWhite).outputFormat("jpg").outputQuality(0.8)
+                        .toFile(root.resolve(thumbKey).toFile());
+                thumbUrl = urlPrefix + thumbKey;
+            } catch (Exception e) {
+                log.warn("缩略图生成失败，使用原图：{}", key);
+            }
         }
 
-        int[] size = StorageService.readSize(bytes);
-        return new StoredFile(key, url, thumbUrl,
-                size == null ? null : size[0], size == null ? null : size[1], bytes.length);
+        return new StoredFile(key, url, thumbUrl, info.width(), info.height(), bytes.length);
     }
 
     @Override

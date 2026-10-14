@@ -25,3 +25,7 @@ export function uploadAvatar(file: File) {
   form.append('file', file)
   return request<User>({ url: '/users/me/avatar', method: 'post', data: form, timeout: 60 * 1000 })
 }
+
+/** 注销账号，需要密码确认 */
+export const deleteAccount = (password: string) =>
+  request<void>({ url: '/users/me/delete', method: 'post', data: { password } })

@@ -2,6 +2,7 @@ package com.sheyinglai.dto;
 
 import com.sheyinglai.entity.Booking;
 import com.sheyinglai.entity.Photographer;
+import com.sheyinglai.entity.Report;
 import com.sheyinglai.entity.Review;
 import com.sheyinglai.entity.User;
 
@@ -36,6 +37,11 @@ public final class Views {
     }
 
     /** 首页摄影师卡片 */
+    /** 首页列表的筛选条件 */
+    public record PhotographerQuery(String style, String sort, String keyword, String city,
+                                    Integer minPrice, Integer maxPrice) {
+    }
+
     public record PhotographerCard(
             Long id, String nickname, String avatarUrl, Integer gender, String tag,
             BigDecimal ratingAvg, Integer ratingCount, Integer dealCount,
@@ -70,6 +76,18 @@ public final class Views {
      */
     public record BookingView(Booking booking, UserBrief customer, UserBrief photographer,
                               String photographerContact) {
+    }
+
+    /** 举报对象：summary 摘要，link 前端链接，ownerId 摄影师 / 客片作者的用户 id */
+    public record ReportTarget(String summary, String link, Long ownerId) {
+    }
+
+    /** target 为空表示举报的内容已被删除 */
+    public record ReportView(Report report, UserBrief reporter, ReportTarget target) {
+    }
+
+    /** 取消预览：penalty 现在取消需要付的违约金（元），policy / percent 摄影师的取消规则 */
+    public record CancelPreview(int penalty, String policy, int percent) {
     }
 
     /** user：评价列表里是评价人，「我的点评」里是被评价的摄影师 */

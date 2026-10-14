@@ -46,9 +46,27 @@ public class BookingController {
         return Result.ok(bookingService.reject(id));
     }
 
+    @GetMapping("/{id}")
+    public Result<Views.BookingView> detail(@PathVariable Long id) {
+        return Result.ok(bookingService.detail(id));
+    }
+
+    @GetMapping("/{id}/cancel-preview")
+    public Result<Views.CancelPreview> cancelPreview(@PathVariable Long id) {
+        return Result.ok(bookingService.cancelPreview(id));
+    }
+
+    /** 请求体可选：reason 取消原因，acceptPenalty 同意支付违约金 */
     @PostMapping("/{id}/cancel")
-    public Result<Views.BookingView> cancel(@PathVariable Long id) {
-        return Result.ok(bookingService.cancel(id));
+    public Result<Views.BookingView> cancel(@PathVariable Long id,
+                                            @Valid @RequestBody(required = false) BookingReqs.CancelReq req) {
+        return Result.ok(bookingService.cancel(id, req == null ? BookingReqs.CancelReq.EMPTY : req));
+    }
+
+    @PostMapping("/{id}/reschedule")
+    public Result<Views.BookingView> reschedule(@PathVariable Long id,
+                                                @Valid @RequestBody BookingReqs.RescheduleReq req) {
+        return Result.ok(bookingService.reschedule(id, req));
     }
 
     @PostMapping("/{id}/complete")

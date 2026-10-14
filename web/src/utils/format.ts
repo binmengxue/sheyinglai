@@ -21,6 +21,7 @@ export const BOOKING_STATUS: Record<BookingStatus, { label: string; type: 'warni
   COMPLETED: { label: '已完成', type: 'primary' },
   CANCELLED: { label: '已取消', type: 'info' },
   REJECTED: { label: '已拒绝', type: 'danger' },
+  EXPIRED: { label: '已过期', type: 'info' },
 }
 
 export const DAY_STATUS: Record<DayStatus, string> = { EXPIRED: '已过期', OFF: '休息', FULL: '约满', AVAILABLE: '可约' }
@@ -67,6 +68,15 @@ export const toMinutes = (t: string) => {
 }
 
 const LOC_KEY = 'photo_location'
+
+/** 同步读取本次会话已缓存的定位：undefined 表示还没定位过，null 表示定位失败 */
+export function peekLocation(): { lat: number; lng: number } | null | undefined {
+  try {
+    const cached = sessionStorage.getItem(LOC_KEY)
+    if (cached) return cached === 'none' ? null : JSON.parse(cached)
+  } catch { /* 存储不可用 */ }
+  return undefined
+}
 
 /**
  * 获取当前位置用于算距离，结果在本次会话内缓存。

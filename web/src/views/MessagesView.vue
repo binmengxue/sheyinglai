@@ -7,7 +7,8 @@
   <div class="messages">
 
     <div class="list">
-      <div v-for="n in list" :key="n.id" class="card item" :class="{ unread: !n.isRead }" @click="open(n)">
+      <div v-for="n in list" :key="n.id" class="card item" :class="{ unread: !n.isRead }" role="button" tabindex="0"
+        @click="open(n)" @keydown.enter="open(n)">
         <el-icon class="icon" :size="20"><component :is="ICONS[n.type]" /></el-icon>
         <div class="body">
           <div class="title">{{ n.title }}<i v-if="!n.isRead" class="dot" /></div>
@@ -30,39 +31,17 @@ import { useRouter } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
 import { listNotifications, readAllNotifications, readNotification } from '@/api/notification'
 import { useNotificationStore } from '@/stores/notification'
+import { usePagedList } from '@/composables/usePagedList'
 import { fmtDateTime } from '@/utils/format'
 import { toast } from '@/utils/message'
 import type { Notification } from '@/types'
 
-const ICONS: Record<Notification['type'], string> = { BOOKING: 'Tickets', REVIEW: 'ChatDotRound', FOLLOW: 'User' }
+const ICONS: Record<Notification['type'], string> = { BOOKING: 'Tickets', REVIEW: 'ChatDotRound', FOLLOW: 'User', REPORT: 'Warning' }
 const PAGE_SIZE = 20
 const router = useRouter()
 const notification = useNotificationStore()
 
-const list = ref<Notification[]>([])
-const total = ref(0)
-const loading = ref(false)
-const error = ref(false)
-let page = 0
-
-async function load(reset = false) {
-  if (reset) {
-    list.value = []
-    page = 0
-  }
-  loading.value = true
-  error.value = false
-  try {
-    const res = await listNotifications(page + 1, PAGE_SIZE)
-    list.value.push(...res.records)
-    total.value = res.total
-    page++
-  } catch {
-    error.value = true
-  } finally {
-    loading.value = false
-  }
-}
+const { list, total, loading, error, load } = usePagedList<Notification>((page) => listNotifications(page, PAGE_SIZE))
 
 /** 点击：标记已读并跳到相关页面 */
 async function open(n: Notification) {

@@ -27,15 +27,23 @@ public class PhotographerController {
     private final ReviewService reviewService;
     private final SocialService socialService;
 
-    /** 首页列表。sort：default 综合 / distance 距离（需传 lat、lng） / rating 评分 / price 价格 */
+    /**
+     * 首页列表。sort：default 综合 / distance 距离（需传 lat、lng） / rating 评分 / price 价格；
+     * keyword 按昵称搜索，city 按城市，minPrice / maxPrice 每小时价格区间
+     */
     @GetMapping
     public Result<PageResult<Views.PhotographerCard>> list(@RequestParam(required = false) String style,
                                                            @RequestParam(required = false) String sort,
+                                                           @RequestParam(required = false) String keyword,
+                                                           @RequestParam(required = false) String city,
+                                                           @RequestParam(required = false) Integer minPrice,
+                                                           @RequestParam(required = false) Integer maxPrice,
                                                            @RequestParam(required = false) Double lat,
                                                            @RequestParam(required = false) Double lng,
                                                            @RequestParam(defaultValue = "1") long page,
                                                            @RequestParam(defaultValue = "10") long size) {
-        return Result.ok(photographerService.list(style, sort, lat, lng, page, size));
+        Views.PhotographerQuery q = new Views.PhotographerQuery(style, sort, keyword, city, minPrice, maxPrice);
+        return Result.ok(photographerService.list(q, lat, lng, page, size));
     }
 
     /** track=false 时不计主页浏览量（档期页等顺带取资料的场景） */
@@ -73,6 +81,22 @@ public class PhotographerController {
                                                         @RequestParam(defaultValue = "1") long page,
                                                         @RequestParam(defaultValue = "20") long size) {
         return Result.ok(reviewService.ofPhotographer(id, page, size));
+    }
+
+    /** 粉丝列表 */
+    @GetMapping("/{id}/fans")
+    public Result<PageResult<Views.UserBrief>> fans(@PathVariable Long id,
+                                                    @RequestParam(defaultValue = "1") long page,
+                                                    @RequestParam(defaultValue = "20") long size) {
+        return Result.ok(socialService.fans(id, page, size));
+    }
+
+    /** 关注列表 */
+    @GetMapping("/{id}/following")
+    public Result<PageResult<Views.UserBrief>> following(@PathVariable Long id,
+                                                         @RequestParam(defaultValue = "1") long page,
+                                                         @RequestParam(defaultValue = "20") long size) {
+        return Result.ok(socialService.following(id, page, size));
     }
 
     @SaCheckLogin

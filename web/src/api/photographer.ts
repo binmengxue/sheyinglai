@@ -1,12 +1,13 @@
 import { request } from '@/utils/request'
 import type {
-  PageResult, Photographer, PhotographerCard, PhotographerDetail, PhotographerForm, ReviewView, ScheduleView,
+  PageResult, Photographer, UserBrief, PhotographerCard, PhotographerDetail, PhotographerForm, ReviewView, ScheduleView,
 } from '@/types'
 
 export type SortKey = 'default' | 'distance' | 'rating' | 'price'
 
 export const listPhotographers = (params: {
-  style?: string; sort?: SortKey; lat?: number; lng?: number; page?: number; size?: number
+  style?: string; sort?: SortKey; keyword?: string; city?: string; minPrice?: number; maxPrice?: number
+  lat?: number; lng?: number; page?: number; size?: number
 }) => request<PageResult<PhotographerCard>>({ url: '/photographers', params })
 
 /** track=false：不计入主页浏览量 */
@@ -28,3 +29,9 @@ export const listReviews = (id: number, page = 1, size = 20) =>
 
 export const follow = (id: number) => request<void>({ url: `/photographers/${id}/follow`, method: 'post' })
 export const unfollow = (id: number) => request<void>({ url: `/photographers/${id}/follow`, method: 'delete' })
+
+export const listFans = (id: number, page = 1, size = 20) =>
+  request<PageResult<UserBrief>>({ url: `/photographers/${id}/fans`, params: { page, size } })
+
+export const listFollowing = (id: number, page = 1, size = 20) =>
+  request<PageResult<UserBrief>>({ url: `/photographers/${id}/following`, params: { page, size } })

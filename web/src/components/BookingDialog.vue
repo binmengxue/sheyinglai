@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="预约拍摄" width="440px" align-center>
+  <el-dialog v-model="visible" :title="reschedule ? '改期' : '预约拍摄'" width="440px" align-center>
     <el-form ref="formRef" :model="form" :rules="rules" label-width="82px">
       <el-form-item label="日期">
         <span>{{ fmtDay(date) }}</span>
@@ -13,9 +13,10 @@
         <el-input-number v-model="form.hours" :min="minHours" :max="maxHours" />
         <span class="muted gap">小时，{{ form.startTime ? `${form.startTime}~${addHours(form.startTime, form.hours)}` : '' }}</span>
       </el-form-item>
-      <el-form-item label="人数">
+      <el-form-item v-if="!reschedule" label="人数">
         <el-input-number v-model="form.people" :min="1" :max="20" />
       </el-form-item>
+      <template v-if="!reschedule">
       <el-form-item v-if="styles.length" label="类型">
         <el-select v-model="form.style" clearable placeholder="想拍什么类型">
           <el-option v-for="s in styles" :key="s" :label="s" :value="s" />
@@ -30,14 +31,18 @@
       <el-form-item label="留言">
         <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" placeholder="想要的风格、参考图说明等" />
       </el-form-item>
+      </template>
     </el-form>
+    <p v-if="reschedule" class="muted resched">
+      原时间：{{ fmtDay(reschedule.shootDate) }} {{ hm(reschedule.startTime) }}，{{ reschedule.hours }}小时。改期后需要摄影师重新确认
+    </p>
     <div class="estimate">
       预估费用 <b>¥{{ estimate }}</b>
       <div class="muted">平台不在线收款，摄影师确认后双方线下沟通付款；交通费、超出精修另算</div>
     </div>
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button class="cta" :loading="saving" @click="submit">提交预约</el-button>
+      <el-button class="cta" :loading="saving" @click="submit">{{ reschedule ? '确认改期' : '提交预约' }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -45,14 +50,15 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { type FormInstance, type FormRules } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { toast } from '@/utils/message'
-import { createBooking } from '@/api/booking'
+import { createBooking, rescheduleBooking } from '@/api/booking'
 import { useUserStore } from '@/stores/user'
 import { addHours, fmtDay, hm, toMinutes } from '@/utils/format'
-import type { Photographer, Slot } from '@/types'
+import type { Booking, Photographer, Slot } from '@/types'
 
-const props = defineProps<{ p: Photographer; date: string; slots: Slot[] }>()
+/** reschedule：传入时为改期模式，只选新的日期和时间 */
+const props = defineProps<{ p: Photographer; date: string; slots: Slot[]; reschedule?: Booking }>()
 const visible = defineModel<boolean>({ required: true })
 const user = useUserStore()
 const router = useRouter()
@@ -60,10 +66,10 @@ const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
 const form = reactive({ startTime: '', hours: 1, people: 1, style: '', address: '', contact: '', remark: '' })
-const rules: FormRules = {
+const rules = computed<FormRules>(() => ({
   startTime: [{ required: true, message: '请选择开始时间' }],
-  contact: [{ required: true, message: '请留下联系方式', trigger: 'blur' }],
-}
+  contact: props.reschedule ? [] : [{ required: true, message: '请留下联系方式', trigger: 'blur' }],
+}))
 
 const minHours = computed(() => props.p.minHours)
 const styles = computed(() => props.p.styles?.split(',').filter(Boolean) ?? [])
@@ -97,8 +103,8 @@ watch(visible, (v) => {
   if (!v) return
   Object.assign(form, {
     startTime: startOptions.value[0] ?? '',
-    hours: minHours.value,
-    people: 1,
+    hours: Math.min(Math.max(props.reschedule?.hours ?? minHours.value, minHours.value), maxHours.value),
+    people: props.reschedule?.people ?? 1,
     style: '',
     address: '',
     remark: '',
@@ -107,9 +113,16 @@ watch(visible, (v) => {
 })
 
 async function submit() {
-  await formRef.value?.validate()
+  if (!(await formRef.value?.validate().catch(() => false))) return
   saving.value = true
   try {
+    if (props.reschedule) {
+      await rescheduleBooking(props.reschedule.id, { shootDate: props.date, startTime: form.startTime, hours: form.hours })
+      toast.success('已改期，等待摄影师重新确认')
+      visible.value = false
+      router.replace(`/orders/${props.reschedule.id}`)
+      return
+    }
     await createBooking({ photographerId: props.p.userId, shootDate: props.date, ...form, style: form.style || undefined })
     toast.success('预约已提交，等待摄影师确认')
     visible.value = false
@@ -122,6 +135,7 @@ async function submit() {
 
 <style lang="scss" scoped>
 .gap { margin-left: 8px; }
+.resched { margin: 0 0 12px; }
 .estimate { padding: 12px; border-radius: 10px; background: var(--brand-soft); }
 .estimate b { font-size: 20px; color: #e5483d; }
 .estimate .muted { margin-top: 4px; font-size: 12px; }

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sheyinglai.common.Auth;
 import com.sheyinglai.common.BizException;
 import com.sheyinglai.common.PageResult;
+import com.sheyinglai.common.RateLimiter;
 import com.sheyinglai.dto.BookingReqs;
 import com.sheyinglai.dto.Views;
 import com.sheyinglai.entity.Booking;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -44,10 +46,12 @@ public class BookingService {
     private final UserService userService;
     private final StatService statService;
     private final NotificationService notificationService;
+    private final RateLimiter rateLimiter;
 
     @Transactional
     public Booking create(BookingReqs.CreateReq req) {
         Long uid = Auth.uid();
+        rateLimiter.check("booking:" + uid, 20, Duration.ofHours(1), "预约太频繁，请稍后再试");
         if (uid.equals(req.photographerId())) {
             throw new BizException("不能预约自己");
         }
@@ -74,11 +78,13 @@ public class BookingService {
         b.setPriceEstimate(estimate(p, req.hours(), req.people()));
         b.setStatus(Booking.PENDING);
         b.setReviewed(false);
+        b.setReminded(false);
+        b.setRescheduleCount(0);
         b.setCreatedAt(LocalDateTime.now());
         bookingMapper.insert(b);
         statService.incr(p.getUserId(), StatService.Kind.CONSULT);
-        notify(b.getPhotographerId(), "新的预约",
-                notificationService.nickname(uid) + " 预约了你 " + when(b) + " 的拍摄，请尽快确认", "photographer");
+        notify(b, b.getPhotographerId(), "新的预约",
+                notificationService.nickname(uid) + " 预约了你 " + when(b) + " 的拍摄，请尽快确认");
         return b;
     }
 
@@ -114,7 +120,11 @@ public class BookingService {
         if (b.getShootDate().isBefore(LocalDate.now())) {
             throw new BizException("拍摄日期已过，只能拒绝");
         }
-        // 同一时段可能有多个待确认的预约，确认前检查不和已确认的冲突
+        photographerService.lock(b.getPhotographerId());
+        if (scheduleService.isOff(b.getPhotographerId(), b.getShootDate())) {
+            throw new BizException("这天你设置了休息，请先在档期里取消休息再接单");
+        }
+        // 同一时段可能有多个待确认的预约，确认前检查不和已确认的冲突（已加锁，并发确认会排队）
         boolean overlap = bookingMapper.selectList(new LambdaQueryWrapper<Booking>()
                         .eq(Booking::getPhotographerId, b.getPhotographerId())
                         .eq(Booking::getShootDate, b.getShootDate())
@@ -124,8 +134,8 @@ public class BookingService {
             throw new BizException("和已确认的预约时间冲突，请先拒绝或与客户协商改期");
         }
         Views.BookingView v = transit(b, Booking.CONFIRMED, w -> w.set(Booking::getRespondedAt, LocalDateTime.now()));
-        notify(b.getCustomerId(), "摄影师已接单",
-                "你预约的 " + when(b) + " 的拍摄已确认，可以在订单里查看摄影师联系方式", "customer");
+        notify(b, b.getCustomerId(), "摄影师已接单",
+                "你预约的 " + when(b) + " 的拍摄已确认，可以在订单里查看摄影师联系方式");
         return v;
     }
 
@@ -135,25 +145,131 @@ public class BookingService {
         mustBePhotographer(b);
         mustBe(b, Booking.PENDING);
         Views.BookingView v = transit(b, Booking.REJECTED, w -> w.set(Booking::getRespondedAt, LocalDateTime.now()));
-        notify(b.getCustomerId(), "预约未被接受",
-                "你预约的 " + when(b) + " 的拍摄摄影师暂时无法接单，可以看看其他摄影师", "customer");
+        notify(b, b.getCustomerId(), "预约未被接受",
+                "你预约的 " + when(b) + " 的拍摄摄影师暂时无法接单，可以看看其他摄影师");
         return v;
     }
 
-    @Transactional
-    public Views.BookingView cancel(Long id) {
+    /** 订单详情：只有双方和管理员能看 */
+    public Views.BookingView detail(Long id) {
         Booking b = load(id);
+        Long uid = Auth.uid();
+        if (!uid.equals(b.getCustomerId()) && !uid.equals(b.getPhotographerId()) && !Auth.isAdmin()) {
+            throw new BizException(403, "无权查看");
+        }
+        Map<Long, User> users = userService.mapByIds(List.of(b.getCustomerId(), b.getPhotographerId()));
+        return view(b, users, uid);
+    }
+
+    /** 取消前预览：按摄影师的取消规则，现在取消要付多少违约金 */
+    public Views.CancelPreview cancelPreview(Long id) {
+        Booking b = load(id);
+        Long uid = mustBeParticipant(b);
+        mustBe(b, Booking.PENDING, Booking.CONFIRMED);
+        boolean byCustomer = uid.equals(b.getCustomerId());
+        checkCustomerCanCancel(b, byCustomer);
+        Photographer p = photographerMapper.selectById(b.getPhotographerId());
+        int penalty = byCustomer ? penalty(b, p) : 0;
+        return new Views.CancelPreview(penalty, p == null ? null : p.getCancelPolicy(),
+                p == null ? 0 : nz(p.getPenaltyPercent()));
+    }
+
+    @Transactional
+    public Views.BookingView cancel(Long id, BookingReqs.CancelReq req) {
+        Booking b = load(id);
+        Long uid = mustBeParticipant(b);
+        mustBe(b, Booking.PENDING, Booking.CONFIRMED);
+        boolean byCustomer = uid.equals(b.getCustomerId());
+        checkCustomerCanCancel(b, byCustomer);
+        int penalty = byCustomer ? penalty(b, photographerMapper.selectById(b.getPhotographerId())) : 0;
+        if (penalty > 0 && !req.acceptPenalty()) {
+            throw new BizException(409, "按摄影师的取消规则，现在取消需支付违约金 ¥" + penalty + "，确认后再取消");
+        }
+        String reason = trim(req.reason());
+        Views.BookingView v = transit(b, Booking.CANCELLED, w -> w.set(Booking::getCancelledBy, uid)
+                .set(Booking::getCancelReason, reason)
+                .set(Booking::getPenaltyAmount, penalty > 0 ? penalty : null));
+        notify(b, byCustomer ? b.getPhotographerId() : b.getCustomerId(), "预约已取消",
+                notificationService.nickname(uid) + " 取消了 " + when(b) + " 的拍摄预约"
+                        + (reason == null ? "" : "，原因：" + reason)
+                        + (penalty > 0 ? "（按取消规则需支付违约金 ¥" + penalty + "）" : ""));
+        return v;
+    }
+
+    /**
+     * 客户改期：待确认或已确认的预约都可以改，改完回到「待确认」，需要摄影师重新确认。
+     * 最多改 3 次，拍摄开始后不能再改。
+     */
+    @Transactional
+    public Views.BookingView reschedule(Long id, BookingReqs.RescheduleReq req) {
+        Booking b = load(id);
+        if (!Auth.uid().equals(b.getCustomerId())) {
+            throw new BizException(403, "只有预约人可以改期");
+        }
+        mustBe(b, Booking.PENDING, Booking.CONFIRMED);
+        if (!b.startAt().isAfter(LocalDateTime.now())) {
+            throw new BizException("拍摄已经开始，不能改期");
+        }
+        if (nz(b.getRescheduleCount()) >= MAX_RESCHEDULE) {
+            throw new BizException("每个预约最多改期 " + MAX_RESCHEDULE + " 次，请取消后重新预约");
+        }
+        if (req.shootDate().equals(b.getShootDate()) && req.startTime().equals(b.getStartTime())
+                && req.hours().equals(b.getHours())) {
+            throw new BizException("新的时间和原来一样");
+        }
+        Photographer p = photographerService.getBookable(b.getPhotographerId());
+        photographerService.lock(p.getUserId());
+        scheduleService.checkBookable(p, req.shootDate(), req.startTime(), req.hours(), b.getId());
+        String oldWhen = when(b);
+        Views.BookingView v = transit(b, Booking.PENDING, w -> w
+                .set(Booking::getShootDate, req.shootDate())
+                .set(Booking::getStartTime, req.startTime())
+                .set(Booking::getHours, req.hours())
+                .set(Booking::getPriceEstimate, estimate(p, req.hours(), b.getPeople()))
+                .set(Booking::getRespondedAt, null)
+                .set(Booking::getReminded, false)
+                .set(Booking::getRescheduleCount, nz(b.getRescheduleCount()) + 1));
+        notify(b, b.getPhotographerId(), "客户申请改期",
+                notificationService.nickname(b.getCustomerId()) + " 把 " + oldWhen + " 的预约改到了 "
+                        + when(v.booking()) + "，请重新确认");
+        return v;
+    }
+
+    private static final int MAX_RESCHEDULE = 3;
+
+    /**
+     * 违约金：只有客户取消已确认的预约才可能产生，按预估费用的比例计算。
+     * LOOSE 不收；NORMAL 拍摄前 24 小时内取消才收；STRICT 任何时候取消都收。
+     */
+    static int penalty(Booking b, Photographer p) {
+        if (p == null || !Booking.CONFIRMED.equals(b.getStatus())) return 0;
+        int percent = nz(p.getPenaltyPercent());
+        if (percent <= 0) return 0;
+        boolean charge = switch (p.getCancelPolicy() == null ? "" : p.getCancelPolicy()) {
+            case "STRICT" -> true;
+            case "NORMAL" -> !LocalDateTime.now().isBefore(b.startAt().minusHours(24));
+            default -> false;
+        };
+        return charge ? nz(b.getPriceEstimate()) * percent / 100 : 0;
+    }
+
+    /** 拍摄开始后客户不能再取消已确认的预约（摄影师仍可取消，比如客户没到场） */
+    private static void checkCustomerCanCancel(Booking b, boolean byCustomer) {
+        if (byCustomer && Booking.CONFIRMED.equals(b.getStatus()) && !b.startAt().isAfter(LocalDateTime.now())) {
+            throw new BizException("拍摄时间已到，不能再取消，有问题请直接联系摄影师");
+        }
+    }
+
+    private static Long mustBeParticipant(Booking b) {
         Long uid = Auth.uid();
         if (!uid.equals(b.getCustomerId()) && !uid.equals(b.getPhotographerId())) {
             throw new BizException(403, "无权操作");
         }
-        mustBe(b, Booking.PENDING, Booking.CONFIRMED);
-        Views.BookingView v = transit(b, Booking.CANCELLED, w -> w.set(Booking::getCancelledBy, uid));
-        boolean byCustomer = uid.equals(b.getCustomerId());
-        notify(byCustomer ? b.getPhotographerId() : b.getCustomerId(), "预约已取消",
-                notificationService.nickname(uid) + " 取消了 " + when(b) + " 的拍摄预约",
-                byCustomer ? "photographer" : "customer");
-        return v;
+        return uid;
+    }
+
+    private static int nz(Integer n) {
+        return n == null ? 0 : n;
     }
 
     @Transactional
@@ -168,7 +284,7 @@ public class BookingService {
         });
         photographerMapper.update(null, new LambdaUpdateWrapper<Photographer>()
                 .setSql("deal_count = deal_count + 1").eq(Photographer::getUserId, b.getPhotographerId()));
-        notify(b.getCustomerId(), "拍摄已完成", when(b) + " 的拍摄已完成，快去给摄影师写个评价吧", "customer");
+        notify(b, b.getCustomerId(), "拍摄已完成", when(b) + " 的拍摄已完成，快去给摄影师写个评价吧");
         return v;
     }
 
@@ -206,9 +322,9 @@ public class BookingService {
         return b.getShootDate().atTime(b.getStartTime()).format(WHEN);
     }
 
-    /** 通知订单另一方，role 决定跳到订单页的哪个 tab */
-    private void notify(Long userId, String title, String content, String role) {
-        notificationService.send(userId, Notification.TYPE_BOOKING, title, content, "/orders?role=" + role);
+    /** 通知订单的某一方，点击消息打开订单详情 */
+    private void notify(Booking b, Long userId, String title, String content) {
+        notificationService.send(userId, Notification.TYPE_BOOKING, title, content, "/orders/" + b.getId());
     }
 
     private Views.BookingView view(Booking b, Map<Long, User> users, Long viewer) {

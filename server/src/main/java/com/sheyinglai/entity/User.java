@@ -16,6 +16,8 @@ public class User {
     public static final String ROLE_USER = "USER";
     public static final String STATUS_NORMAL = "NORMAL";
     public static final String STATUS_BANNED = "BANNED";
+    /** 已注销：个人信息已清除，不能再登录 */
+    public static final String STATUS_DELETED = "DELETED";
 
     @TableId(type = IdType.AUTO)
     private Long id;

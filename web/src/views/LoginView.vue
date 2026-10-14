@@ -5,7 +5,7 @@
     <p class="muted">约拍、接单都在这里</p>
     <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="submit">
       <el-form-item prop="phone">
-        <el-input v-model="form.phone" placeholder="手机号" maxlength="11" :prefix-icon="'Iphone'" />
+        <el-input v-model="form.phone" placeholder="手机号" maxlength="11" inputmode="tel" autocomplete="tel" :prefix-icon="'Iphone'" />
       </el-form-item>
       <el-form-item prop="password">
         <el-input v-model="form.password" type="password" placeholder="密码" show-password :prefix-icon="'Lock'" />
@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { type FormInstance, type FormRules } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { toast } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import { useUserStore } from '@/stores/user'
@@ -37,7 +37,7 @@ const rules: FormRules = {
 }
 
 async function submit() {
-  await formRef.value?.validate()
+  if (!(await formRef.value?.validate().catch(() => false))) return
   loading.value = true
   try {
     await user.login(form.phone, form.password)

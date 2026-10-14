@@ -29,7 +29,9 @@ function back() {
 
 <style lang="scss" scoped>
 .navbar {
-  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; height: 50px; padding: 0 8px;
+  position: sticky; top: 0; z-index: 10; display: flex; align-items: center;
+  /* 刘海屏顶部安全区 */
+  height: calc(50px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 8px 0;
   background: rgba(246, 247, 249, 0.94); backdrop-filter: blur(8px);
 }
 .navbar.dark { background: #111; color: #fff; }

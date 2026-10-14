@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.sheyinglai.common.Result;
 import com.sheyinglai.dto.AuthReqs;
 import com.sheyinglai.entity.User;
+import com.sheyinglai.service.AccountService;
 import com.sheyinglai.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.io.IOException;
 public class UserController {
 
     private final UserService userService;
+    private final AccountService accountService;
 
     @PutMapping
     public Result<User> updateProfile(@Valid @RequestBody AuthReqs.ProfileReq req) {
@@ -28,6 +30,13 @@ public class UserController {
     @PutMapping("/password")
     public Result<Void> changePassword(@Valid @RequestBody AuthReqs.PasswordReq req) {
         userService.changePassword(req);
+        return Result.ok();
+    }
+
+    /** 注销账号，需要输入密码确认 */
+    @PostMapping("/delete")
+    public Result<Void> delete(@RequestBody AuthReqs.DeleteAccountReq req) {
+        accountService.delete(req.password());
         return Result.ok();
     }
 

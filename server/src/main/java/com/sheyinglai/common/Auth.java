@@ -2,6 +2,7 @@ package com.sheyinglai.common;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.sheyinglai.entity.User;
+import org.springframework.web.context.request.RequestContextHolder;
 
 /** 当前登录用户相关的小工具，loginId 就是 user.id */
 public final class Auth {
@@ -21,8 +22,9 @@ public final class Auth {
         return id;
     }
 
-    /** 当前用户 id，未登录返回 null */
+    /** 当前用户 id，未登录或不在 HTTP 请求里（如定时任务）返回 null */
     public static Long uidOrNull() {
+        if (RequestContextHolder.getRequestAttributes() == null) return null;
         return StpUtil.isLogin() ? parse(StpUtil.getLoginId()) : null;
     }
 

@@ -1,25 +1,29 @@
 <template>
-  <!-- 手机：单列 + 底部 Tab -->
-  <div v-if="!isDesktop" class="app" :class="{ 'with-tab': route.meta.tab }">
-    <RouterView />
-    <TabBar v-if="route.meta.tab" :active="route.meta.tab" />
-  </div>
-
-  <!-- PC：顶部导航；工作台页面再加左侧菜单（网盘式） -->
-  <div v-else class="desk">
-    <AppHeader />
-    <div v-if="route.meta.studio" class="studio">
-      <StudioMenu class="menu" />
-      <main class="content"><RouterView /></main>
+  <el-config-provider :locale="zhCn">
+    <!-- 手机：单列 + 底部 Tab -->
+    <div v-if="!isDesktop" class="app" :class="{ 'with-tab': route.meta.tab }">
+      <CachedRouterView />
+      <TabBar v-if="route.meta.tab" :active="route.meta.tab" />
     </div>
-    <main v-else class="wide"><RouterView /></main>
-  </div>
+
+    <!-- PC：顶部导航；工作台页面再加左侧菜单（网盘式） -->
+    <div v-else class="desk">
+      <AppHeader />
+      <div v-if="route.meta.studio" class="studio">
+        <StudioMenu class="menu" />
+        <main class="content"><CachedRouterView /></main>
+      </div>
+      <main v-else class="wide"><CachedRouterView /></main>
+    </div>
+  </el-config-provider>
 </template>
 
 <script setup lang="ts">
 import { watch } from 'vue'
 import { useRoute } from 'vue-router'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import TabBar from '@/components/TabBar.vue'
+import CachedRouterView from '@/components/CachedRouterView.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import StudioMenu from '@/components/StudioMenu.vue'
 import { useDevice } from '@/composables/useDevice'
@@ -37,7 +41,7 @@ watch(() => user.loggedIn, (on) => (on ? notification.start() : notification.sto
 
 <style lang="scss" scoped>
 /* 手机版式 */
-.app { position: relative; max-width: var(--app-width); min-height: 100vh; margin: 0 auto; background: var(--bg); }
+.app { position: relative; max-width: var(--app-width); min-height: 100vh; min-height: 100dvh; margin: 0 auto; background: var(--bg); }
 .app.with-tab { padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom)); }
 
 /* PC 版式 */

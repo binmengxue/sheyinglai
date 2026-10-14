@@ -116,7 +116,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { type FormInstance, type FormRules } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { toast } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import { updateMyPhotographer } from '@/api/photographer'
@@ -177,7 +177,7 @@ function locate() {
 }
 
 async function save() {
-  await formRef.value?.validate()
+  if (!(await formRef.value?.validate().catch(() => false))) return
   if (form.workEnd <= form.workStart) return void toast.error('结束时间要晚于开始时间')
   saving.value = true
   try {

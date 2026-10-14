@@ -23,3 +23,10 @@ app:
 logging:
   file:
     name: /srv/photo/logs/app.log
+
+# 线上不开放接口文档
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

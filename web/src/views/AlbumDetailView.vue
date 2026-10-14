@@ -10,6 +10,7 @@
       <p v-if="album.description" class="desc">{{ album.description }}</p>
       <div class="actions">
         <RouterLink :to="`/p/${album.userId}`" class="link">查看摄影师主页 <el-icon><ArrowRight /></el-icon></RouterLink>
+        <ReportButton v-if="!canManage" target-type="ALBUM" :target-id="album.id" />
         <template v-if="canManage">
           <el-button round size="small" :icon="'Edit'" @click="editVisible = true">编辑</el-button>
           <el-button round size="small" class="cta" :icon="'Upload'" @click="uploadVisible = true">上传照片</el-button>
@@ -33,14 +34,17 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { toast, confirm } from '@/utils/message'
+import { toast, confirm, singleFlight } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import PhotoGrid from '@/components/PhotoGrid.vue'
 import UploadDialog from '@/components/UploadDialog.vue'
 import AlbumDialog from '@/components/AlbumDialog.vue'
+import ReportButton from '@/components/ReportButton.vue'
 import { getAlbum, setAlbumCover } from '@/api/album'
 import { deletePhoto, listPhotos } from '@/api/photo'
 import { useUserStore } from '@/stores/user'
+import { usePagedList } from '@/composables/usePagedList'
+import { setTitle } from '@/utils/title'
 import type { Album, Photo } from '@/types'
 
 const props = defineProps<{ id: string }>()
@@ -48,37 +52,21 @@ const user = useUserStore()
 
 const PAGE_SIZE = 40
 const album = ref<Album | null>(null)
-const photos = ref<Photo[]>([])
-const page = ref(0)
-const total = ref(0)
-const loading = ref(false)
 const error = ref(false)
 const uploadVisible = ref(false)
 const editVisible = ref(false)
 /** 本人或管理员可以管理 */
 const canManage = computed(() => !!album.value && (user.user?.id === album.value.userId || user.isAdmin))
 
-async function loadPhotos(reset = false) {
-  if (reset) {
-    photos.value = []
-    page.value = 0
-  }
-  loading.value = true
-  try {
-    const res = await listPhotos({ albumId: Number(props.id), page: page.value + 1, size: PAGE_SIZE })
-    photos.value.push(...res.records)
-    total.value = res.total
-    page.value++
-  } finally {
-    loading.value = false
-  }
-}
+const { list: photos, total, loading, load: loadPhotos } = usePagedList<Photo>((page) =>
+  listPhotos({ albumId: Number(props.id), page, size: PAGE_SIZE }))
 
 async function loadAll() {
   album.value = null
   error.value = false
   try {
     album.value = await getAlbum(Number(props.id))
+    setTitle(album.value.title)
   } catch {
     error.value = true
     return
@@ -86,26 +74,19 @@ async function loadAll() {
   await loadPhotos(true)
 }
 
-async function onDelete(p: Photo) {
+const onDelete = singleFlight(async (p: Photo) => {
   const ok = await confirm('确定删除这张照片？')
   if (!ok) return
   await deletePhoto(p.id)
   photos.value = photos.value.filter((x) => x.id !== p.id)
   total.value--
   toast.success('已删除')
-}
+})
 
-let settingCover = false
-async function onCover(p: Photo) {
-  if (settingCover) return
-  settingCover = true
-  try {
-    await setAlbumCover(Number(props.id), p.id)
-    toast.success('已设为封面')
-  } finally {
-    settingCover = false
-  }
-}
+const onCover = singleFlight(async (p: Photo) => {
+  await setAlbumCover(Number(props.id), p.id)
+  toast.success('已设为封面')
+})
 
 watch(() => props.id, loadAll, { immediate: true })
 </script>

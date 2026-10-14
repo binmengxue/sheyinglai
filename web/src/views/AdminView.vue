@@ -1,6 +1,12 @@
 <template>
   <NavBar fallback="/me" />
   <div class="page">
+    <el-tabs v-model="tab">
+      <el-tab-pane label="用户" name="users" />
+      <el-tab-pane label="举报" name="reports" />
+    </el-tabs>
+    <AdminReports v-if="tab === 'reports'" />
+    <template v-else>
     <el-input v-model="keyword" placeholder="搜索手机号或昵称" clearable :prefix-icon="'Search'" @change="load(true)" />
     <p class="muted tip">入驻不需要审核，发现违规内容时可以封禁账号、从首页隐藏摄影师，或进入主页删除客片。</p>
 
@@ -32,6 +38,7 @@
           <template #default="{ row }">
             <el-tag v-if="row.user.role === 'ADMIN'" size="small">管理员</el-tag>
             <el-tag v-if="row.user.status === 'BANNED'" size="small" type="danger">已封禁</el-tag>
+            <el-tag v-if="row.user.status === 'DELETED'" size="small" type="info">已注销</el-tag>
             <el-tag v-if="row.photographer && !row.photographer.visible" size="small" type="warning">已隐藏</el-tag>
             <el-tag v-if="row.user.status === 'NORMAL' && row.user.role !== 'ADMIN' && row.photographer?.visible !== false" size="small" type="success">正常</el-tag>
           </template>
@@ -39,7 +46,7 @@
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <el-button link @click="$router.push(`/p/${row.user.id}`)">主页</el-button>
-            <template v-if="row.user.role !== 'ADMIN'">
+            <template v-if="row.user.role !== 'ADMIN' && row.user.status !== 'DELETED'">
               <el-button v-if="row.photographer" link @click="toggleVisible(row as AdminUserView)">{{ row.photographer.visible ? '隐藏' : '取消隐藏' }}</el-button>
               <el-button link :type="row.user.status === 'BANNED' ? 'primary' : 'danger'" @click="toggleBan(row as AdminUserView)">
                 {{ row.user.status === 'BANNED' ? '解封' : '封禁' }}
@@ -59,6 +66,7 @@
           {{ v.user.nickname }}
           <el-tag v-if="v.user.role === 'ADMIN'" size="small">管理员</el-tag>
           <el-tag v-if="v.user.status === 'BANNED'" size="small" type="danger">已封禁</el-tag>
+          <el-tag v-if="v.user.status === 'DELETED'" size="small" type="info">已注销</el-tag>
           <el-tag v-if="v.photographer && !v.photographer.visible" size="small" type="warning">已隐藏</el-tag>
         </div>
         <div class="muted">UID {{ v.user.id }} · {{ v.user.phone }} · {{ fmtDateTime(v.user.createdAt) }} 注册</div>
@@ -67,7 +75,7 @@
         </div>
         <div class="ops">
           <el-button link @click="$router.push(`/p/${v.user.id}`)">主页</el-button>
-          <template v-if="v.user.role !== 'ADMIN'">
+          <template v-if="v.user.role !== 'ADMIN' && v.user.status !== 'DELETED'">
             <el-button v-if="v.photographer" link @click="toggleVisible(v)">{{ v.photographer.visible ? '隐藏' : '取消隐藏' }}</el-button>
             <el-button link :type="v.user.status === 'BANNED' ? 'primary' : 'danger'" @click="toggleBan(v)">
               {{ v.user.status === 'BANNED' ? '解封' : '封禁' }}
@@ -79,59 +87,44 @@
     <el-empty v-if="!loading && !list.length" description="没有找到用户" />
     </template>
     <div v-if="list.length < total" class="more"><el-button round :loading="loading" @click="load()">加载更多</el-button></div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { toast, confirm } from '@/utils/message'
+import { toast, confirm, singleFlight } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
+import AdminReports from '@/components/AdminReports.vue'
 import { adminUsers, setBanned, setPhotographerVisible } from '@/api/admin'
 import { fmtDateTime } from '@/utils/format'
+import { usePagedList } from '@/composables/usePagedList'
 import { useDevice } from '@/composables/useDevice'
 import type { AdminUserView } from '@/types'
 
 const { isDesktop } = useDevice()
 
+const tab = ref<'users' | 'reports'>('users')
 const keyword = ref('')
-const list = ref<AdminUserView[]>([])
-const total = ref(0)
-const loading = ref(false)
-let page = 0
+const { list, total, loading, load } = usePagedList<AdminUserView>((page) => adminUsers(keyword.value, page))
 
-async function load(reset = false) {
-  if (reset) {
-    list.value = []
-    page = 0
-  }
-  loading.value = true
-  try {
-    const res = await adminUsers(keyword.value, page + 1)
-    list.value.push(...res.records)
-    total.value = res.total
-    page++
-  } finally {
-    loading.value = false
-  }
-}
-
-async function toggleBan(v: AdminUserView) {
+const toggleBan = singleFlight(async (v: AdminUserView) => {
   const ban = v.user.status !== 'BANNED'
   const ok = await confirm(ban ? `封禁「${v.user.nickname}」？封禁后无法登录，主页和客片对外隐藏` : `解封「${v.user.nickname}」？`)
   if (!ok) return
   await setBanned(v.user.id, ban)
   v.user.status = ban ? 'BANNED' : 'NORMAL'
   toast.success(ban ? '已封禁' : '已解封')
-}
+})
 
-async function toggleVisible(v: AdminUserView) {
+const toggleVisible = singleFlight(async (v: AdminUserView) => {
   const p = v.photographer!
   const ok = await confirm(p.visible ? `把「${v.user.nickname}」从首页隐藏？` : `在首页恢复展示「${v.user.nickname}」？`)
   if (!ok) return
   await setPhotographerVisible(v.user.id, !p.visible)
   p.visible = !p.visible
   toast.success(p.visible ? '已在首页恢复展示' : '已从首页隐藏')
-}
+})
 
 onMounted(() => load(true))
 </script>

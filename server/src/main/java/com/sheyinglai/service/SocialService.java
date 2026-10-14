@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.sheyinglai.common.Auth;
 import com.sheyinglai.common.BizException;
+import com.sheyinglai.common.PageResult;
+import com.sheyinglai.dto.Views;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sheyinglai.entity.Album;
 import com.sheyinglai.entity.AlbumLike;
 import com.sheyinglai.entity.Follow;
@@ -20,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /** 关注摄影师、喜欢客片 */
 @Service
@@ -32,6 +36,7 @@ public class SocialService {
     private final AlbumService albumService;
     private final PhotographerService photographerService;
     private final NotificationService notificationService;
+    private final UserService userService;
 
     public void follow(Long photographerId) {
         Long uid = Auth.uid();
@@ -51,6 +56,28 @@ public class SocialService {
         }
         notificationService.send(photographerId, Notification.TYPE_FOLLOW, "新增粉丝",
                 notificationService.nickname(uid) + " 关注了你", "/p/" + uid);
+    }
+
+    /** 某人的粉丝（关注了他的人），最近关注的在前 */
+    public PageResult<Views.UserBrief> fans(Long userId, long page, long size) {
+        return followPage(new LambdaQueryWrapper<Follow>().eq(Follow::getPhotographerId, userId), Follow::getUserId,
+                page, size);
+    }
+
+    /** 某人关注的摄影师 */
+    public PageResult<Views.UserBrief> following(Long userId, long page, long size) {
+        return followPage(new LambdaQueryWrapper<Follow>().eq(Follow::getUserId, userId), Follow::getPhotographerId,
+                page, size);
+    }
+
+    private PageResult<Views.UserBrief> followPage(LambdaQueryWrapper<Follow> q, Function<Follow, Long> other,
+                                                   long page, long size) {
+        Page<Follow> p = followMapper.selectPage(Page.of(Math.max(1, page), Math.max(1, Math.min(size, 50))),
+                q.orderByDesc(Follow::getId));
+        List<Long> ids = p.getRecords().stream().map(other).toList();
+        Map<Long, Views.UserBrief> users = userService.briefs(ids);
+        List<Views.UserBrief> list = ids.stream().map(id -> users.getOrDefault(id, Views.UserBrief.of(null))).toList();
+        return new PageResult<>(list, p.getTotal(), p.getCurrent(), p.getSize());
     }
 
     public void unfollow(Long photographerId) {

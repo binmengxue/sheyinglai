@@ -21,8 +21,10 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,6 +38,15 @@ public class PhotographerService {
     private static final int CARD_ALBUMS = 5;
 
     private final PhotographerMapper photographerMapper;
+
+    /**
+     * 在当前事务里锁住摄影师这一行，让同一摄影师的接单、设休息等操作串行执行，
+     * 避免「先查冲突再更新」在并发时同时通过。
+     */
+    public void lock(Long userId) {
+        photographerMapper.selectOne(new LambdaQueryWrapper<Photographer>()
+                .eq(Photographer::getUserId, userId).last("FOR UPDATE"));
+    }
     private final UserMapper userMapper;
     private final AlbumMapper albumMapper;
     private final AlbumService albumService;
@@ -100,16 +111,29 @@ public class PhotographerService {
      * 首页摄影师列表。
      * 摄影师数量不大，先全部取出在内存里算距离、排序、分页；量大以后再改成 SQL 计算。
      *
-     * @param sort default 综合（成交多、评分高）/ distance 距离 / rating 评分 / price 价格从低到高
+     * @param sort    default 综合（成交多、评分高）/ distance 距离 / rating 评分 / price 价格从低到高
+     * @param keyword 按昵称搜索
+     * @param city    按城市筛选（用户资料里填的城市，包含即可）
      */
-    public PageResult<Views.PhotographerCard> list(String style, String sort, Double lat, Double lng,
+    public PageResult<Views.PhotographerCard> list(Views.PhotographerQuery q, Double lat, Double lng,
                                                    long page, long size) {
+        String style = q.style();
+        String sort = q.sort();
         List<Photographer> all = photographerMapper.selectList(new LambdaQueryWrapper<Photographer>()
                 .eq(Photographer::getVisible, true)
                 .gt(Photographer::getPricePerHour, 0)
+                .ge(q.minPrice() != null, Photographer::getPricePerHour, q.minPrice())
+                .le(q.maxPrice() != null, Photographer::getPricePerHour, q.maxPrice())
                 .like(StringUtils.hasText(style), Photographer::getStyles, style));
         Map<Long, User> users = usersOf(all);
-        all = all.stream().filter(p -> isNormal(users.get(p.getUserId()))).toList();
+        String keyword = StringUtils.hasText(q.keyword()) ? q.keyword().trim() : null;
+        String city = StringUtils.hasText(q.city()) ? q.city().trim() : null;
+        all = all.stream().filter(p -> {
+            User u = users.get(p.getUserId());
+            return isNormal(u)
+                    && (keyword == null || u.getNickname().contains(keyword))
+                    && (city == null || (u.getCity() != null && u.getCity().contains(city)));
+        }).toList();
 
         boolean hasLoc = lat != null && lng != null;
         Map<Long, Double> dist = hasLoc ? all.stream().filter(p -> p.getLat() != null && p.getLng() != null)
@@ -135,9 +159,10 @@ public class PhotographerService {
         List<Long> ids = pageList.stream().map(Photographer::getUserId).toList();
         Map<Long, Integer> consult = statService.recentConsult(ids);
         Long viewer = Auth.uidOrNull();
+        Map<Long, List<Album>> albums = cardAlbums(ids);
         List<Views.PhotographerCard> cards = pageList.stream()
                 .map(p -> card(p, users.get(p.getUserId()), dist.get(p.getUserId()),
-                        consult.getOrDefault(p.getUserId(), 0)))
+                        consult.getOrDefault(p.getUserId(), 0), albums.getOrDefault(p.getUserId(), List.of())))
                 .toList();
         ids.stream().filter(id -> !id.equals(viewer)).forEach(id -> statService.incr(id, StatService.Kind.EXPOSURE));
         return new PageResult<>(cards, all.size(), pageNo, pageSize);
@@ -180,7 +205,7 @@ public class PhotographerService {
         if (track && !self) {
             statService.incr(id, StatService.Kind.PROFILE_VIEW);
         }
-        return new Views.PhotographerDetail(card(p, user, dist, consult), p, user.getBio(), user.getCity(),
+        return new Views.PhotographerDetail(card(p, user, dist, consult, cardAlbums(List.of(id)).getOrDefault(id, List.of())), p, user.getBio(), user.getCity(),
                 fans, following, followed, self, rank, styleCounts);
     }
 
@@ -202,13 +227,23 @@ public class PhotographerService {
         return p;
     }
 
-    private Views.PhotographerCard card(Photographer p, User u, Double dist, int consult) {
-        List<Album> albums = albumMapper.selectList(new LambdaQueryWrapper<Album>()
-                .eq(Album::getUserId, p.getUserId()).eq(Album::getVisible, true)
+    /** 一次查出这些摄影师卡片上要展示的客片（每人前 CARD_ALBUMS 个），避免每张卡片单独查询 */
+    private Map<Long, List<Album>> cardAlbums(List<Long> userIds) {
+        if (userIds.isEmpty()) return Map.of();
+        List<Album> all = albumMapper.selectList(new LambdaQueryWrapper<Album>()
+                .in(Album::getUserId, userIds).eq(Album::getVisible, true)
                 .isNotNull(Album::getCoverUrl)
-                .orderByAsc(Album::getSort).orderByDesc(Album::getId)
-                .last("LIMIT " + CARD_ALBUMS));
-        albumService.fill(albums);
+                .orderByAsc(Album::getSort).orderByDesc(Album::getId));
+        Map<Long, List<Album>> byUser = new HashMap<>();
+        for (Album a : all) {
+            List<Album> list = byUser.computeIfAbsent(a.getUserId(), k -> new ArrayList<>());
+            if (list.size() < CARD_ALBUMS) list.add(a);
+        }
+        albumService.fill(byUser.values().stream().flatMap(List::stream).toList());
+        return byUser;
+    }
+
+    private Views.PhotographerCard card(Photographer p, User u, Double dist, int consult, List<Album> albums) {
         List<String> styles = p.getStyles() == null ? List.of()
                 : Arrays.stream(p.getStyles().split(",")).filter(StringUtils::hasText).toList();
         return new Views.PhotographerCard(p.getUserId(), u.getNickname(), u.getAvatarUrl(), u.getGender(), p.getTag(),

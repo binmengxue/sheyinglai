@@ -8,10 +8,14 @@ Wants=mysql.service
 User=photo
 WorkingDirectory=/srv/photo-dev
 EnvironmentFile=/srv/photo-dev/photo.env
-ExecStart=/usr/bin/java -Xms128m -Xmx384m -jar /srv/photo-dev/app.jar --spring.profiles.active=test
+ExecStart=/usr/bin/java -Duser.timezone=Asia/Shanghai -Xms128m -Xmx384m -jar /srv/photo-dev/app.jar --spring.profiles.active=test
 SuccessExitStatus=143
 Restart=always
 RestartSec=5
+# 基础加固：不能提权，系统目录只读，独立 /tmp
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

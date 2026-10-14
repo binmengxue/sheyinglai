@@ -58,7 +58,7 @@ watch(visible, (v) => {
 })
 
 async function submit() {
-  await formRef.value?.validate()
+  if (!(await formRef.value?.validate().catch(() => false))) return
   saving.value = true
   try {
     const saved = props.album ? await updateAlbum(props.album.id, form) : await createAlbum(form)

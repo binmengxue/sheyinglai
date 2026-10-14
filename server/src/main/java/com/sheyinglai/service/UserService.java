@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.sheyinglai.common.Auth;
 import com.sheyinglai.common.BizException;
+import com.sheyinglai.common.RateLimiter;
 import com.sheyinglai.dto.AuthReqs;
 import com.sheyinglai.dto.Views;
 import com.sheyinglai.entity.User;
@@ -19,6 +20,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Map;
@@ -36,10 +38,12 @@ public class UserService {
     private final PhotographerService photographerService;
     private final StorageService storage;
     private final PasswordEncoder encoder;
+    private final RateLimiter rateLimiter;
 
     /** 注册即成为摄影师（按需求不审核），同时完成登录 */
     @Transactional
     public Views.LoginResult register(AuthReqs.RegisterReq req) {
+        rateLimiter.check("register:" + RateLimiter.clientIp(), 5, Duration.ofHours(1), "注册太频繁，请稍后再试");
         if (userMapper.exists(new LambdaQueryWrapper<User>().eq(User::getPhone, req.phone()))) {
             throw new BizException("该手机号已注册，请直接登录");
         }
@@ -63,6 +67,9 @@ public class UserService {
     }
 
     public Views.LoginResult login(AuthReqs.LoginReq req) {
+        // 按 IP 和手机号分别限制，防止撞库和暴力破解
+        rateLimiter.check("login:ip:" + RateLimiter.clientIp(), 30, Duration.ofMinutes(10), "登录尝试太频繁，请 10 分钟后再试");
+        rateLimiter.check("login:phone:" + req.phone(), 10, Duration.ofMinutes(10), "登录尝试太频繁，请 10 分钟后再试");
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, req.phone()));
         if (user == null || !encoder.matches(req.password(), user.getPasswordHash())) {
             throw new BizException("手机号或密码错误");

@@ -6,12 +6,19 @@
     </header>
 
     <div class="filters">
+      <div class="search">
+        <el-input v-model="keyword" placeholder="搜索摄影师昵称" clearable :prefix-icon="'Search'" @change="load(true)" />
+        <el-input v-model="city" placeholder="城市" clearable class="city" @change="load(true)" />
+        <el-select v-model="price" class="price" aria-label="价格" @change="load(true)">
+          <el-option v-for="(p, i) in PRICES" :key="i" :label="p.label" :value="i" />
+        </el-select>
+      </div>
       <div class="chips">
         <button class="chip" :class="{ active: !style }" @click="setStyle('')">全部</button>
         <button v-for="s in STYLES" :key="s" class="chip" :class="{ active: style === s }" @click="setStyle(s)">{{ s }}</button>
       </div>
       <div class="sorts">
-        <span v-for="s in sorts" :key="s.key" class="sort" :class="{ active: sort === s.key }" @click="setSort(s.key)">{{ s.label }}</span>
+        <button v-for="s in sorts" :key="s.key" type="button" class="sort" :class="{ active: sort === s.key }" @click="setSort(s.key)">{{ s.label }}</button>
       </div>
     </div>
 
@@ -20,6 +27,9 @@
     </div>
     <div v-if="loading" v-loading="true" class="loading" />
     <el-empty v-else-if="error && !list.length" description="加载失败"><el-button round @click="load(true)">重试</el-button></el-empty>
+    <el-empty v-else-if="!list.length && filtered" description="没有找到符合条件的摄影师">
+      <el-button round @click="clearFilters">清除筛选</el-button>
+    </el-empty>
     <el-empty v-else-if="!list.length" description="附近还没有摄影师，快来成为第一个吧">
       <el-button class="cta" round @click="$router.push('/studio/profile')">我是摄影师，去入驻</el-button>
     </el-empty>
@@ -37,10 +47,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PhotographerCard from '@/components/PhotographerCard.vue'
 import { listPhotographers, type SortKey } from '@/api/photographer'
-import { getLocation, STYLES } from '@/utils/format'
+import { usePagedList } from '@/composables/usePagedList'
+import { getLocation, peekLocation, STYLES } from '@/utils/format'
 import { toast } from '@/utils/message'
 import type { PhotographerCard as Card } from '@/types'
 
@@ -52,34 +63,34 @@ const sorts: { key: SortKey; label: string }[] = [
   { key: 'price', label: '价格最低' },
 ]
 
-const list = ref<Card[]>([])
-const total = ref(0)
-const page = ref(0)
-const loading = ref(false)
-const error = ref(false)
+/** 每小时价格区间 */
+const PRICES: { label: string; min?: number; max?: number }[] = [
+  { label: '价格不限' },
+  { label: '200 元以下', max: 199 },
+  { label: '200~500 元', min: 200, max: 500 },
+  { label: '500 元以上', min: 501 },
+]
+
 const style = ref('')
 const sort = ref<SortKey>('default')
-let loc: { lat: number; lng: number } | null = null
+const keyword = ref('')
+const city = ref('')
+const price = ref(0)
+const filtered = computed(() => !!(style.value || keyword.value.trim() || city.value.trim() || price.value))
+let loc = peekLocation() ?? null
 
-async function load(reset = false) {
-  if (reset) {
-    list.value = []
-    page.value = 0
-  }
-  loading.value = true
-  error.value = false
-  try {
-    const res = await listPhotographers({
-      style: style.value || undefined, sort: sort.value, ...(loc ?? {}), page: page.value + 1, size: PAGE_SIZE,
-    })
-    list.value.push(...res.records)
-    total.value = res.total
-    page.value++
-  } catch {
-    error.value = true
-  } finally {
-    loading.value = false
-  }
+const { list, total, loading, error, load } = usePagedList<Card>((page) => listPhotographers({
+  style: style.value || undefined, sort: sort.value, ...(loc ?? {}), page, size: PAGE_SIZE,
+  keyword: keyword.value.trim() || undefined, city: city.value.trim() || undefined,
+  minPrice: PRICES[price.value].min, maxPrice: PRICES[price.value].max,
+}))
+
+function clearFilters() {
+  style.value = ''
+  keyword.value = ''
+  city.value = ''
+  price.value = 0
+  load(true)
 }
 
 function setStyle(s: string) {
@@ -97,9 +108,14 @@ async function setSort(s: SortKey) {
 }
 
 onMounted(async () => {
-  // 定位最多等几秒，失败也照常展示列表（只是没有距离）
-  loc = await getLocation()
+  // 先出列表；第一次打开时定位可能要等几秒，拿到后再刷新一次补上距离
   load(true)
+  if (peekLocation() !== undefined) return
+  const got = await getLocation()
+  if (got && !loc) {
+    loc = got
+    load(true)
+  }
 })
 </script>
 
@@ -111,8 +127,11 @@ onMounted(async () => {
   position: sticky; top: 0; z-index: 5; margin-top: -36px; padding: 12px 12px 8px;
   background: var(--bg); border-radius: 18px 18px 0 0;
 }
+.search { display: flex; gap: 8px; margin-bottom: 10px; }
+.search .city { width: 88px; flex-shrink: 0; }
+.search .price { width: 120px; flex-shrink: 0; }
 .sorts { display: flex; gap: 18px; margin-top: 10px; font-size: 14px; color: #666; }
-.sort { cursor: pointer; }
+.sort { cursor: pointer; border: none; background: none; padding: 0; font: inherit; color: inherit; }
 .sort.active { color: var(--text); font-weight: 700; }
 .list { display: flex; flex-direction: column; gap: 10px; padding: 4px 12px; }
 .loading { height: 120px; }
@@ -123,7 +142,12 @@ onMounted(async () => {
 @media (min-width: 768px) {
   .hero { padding: 28px 32px; border-radius: var(--radius); }
   .brand { font-size: 28px; }
-  .filters { position: static; margin-top: 0; padding: 16px 0 8px; border-radius: 0; display: flex; align-items: center; gap: 16px; }
+  .filters { position: static; margin-top: 0; padding: 16px 0 8px; border-radius: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+  /* 搜索单独占一行，筛选和排序在下一行 */
+  .search { flex: 0 0 100%; margin-bottom: 0; }
+  .search > .el-input:first-child { max-width: 360px; }
+  .search .city { width: 140px; }
+  .search .price { width: 140px; }
   .filters .chips { flex: 1; }
   .sorts { margin-top: 0; flex-shrink: 0; }
   .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 16px; padding: 8px 0; }

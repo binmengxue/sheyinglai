@@ -3,6 +3,7 @@ package com.sheyinglai.common;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotRoleException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -37,9 +38,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<Void> invalid(MethodArgumentNotValidException e) {
+        // 自定义了中文提示的直接用，否则带上字段名方便排查
         String msg = e.getBindingResult().getFieldErrors().stream()
-                .findFirst().map(f -> f.getField() + " " + f.getDefaultMessage()).orElse("参数错误");
+                .findFirst().map(f -> hasChinese(f.getDefaultMessage()) ? f.getDefaultMessage()
+                        : f.getField() + " " + f.getDefaultMessage()).orElse("参数错误");
         return Result.fail(400, msg);
+    }
+
+    /** 唯一约束冲突，一般是重复提交（如同一预约评价两次） */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public Result<Void> duplicate(DuplicateKeyException e) {
+        return Result.fail(400, "请勿重复提交");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -59,6 +68,10 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> badRequest(Exception e) {
         return Result.fail(400, "请求参数错误");
+    }
+
+    private static boolean hasChinese(String s) {
+        return s != null && s.codePoints().anyMatch(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN);
     }
 
     @ExceptionHandler(Exception.class)

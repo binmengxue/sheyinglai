@@ -5,13 +5,13 @@
     <p class="muted">注册后既可以约拍，也可以设置价格开始接单</p>
     <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="submit">
       <el-form-item prop="phone">
-        <el-input v-model="form.phone" placeholder="手机号" maxlength="11" :prefix-icon="'Iphone'" />
+        <el-input v-model="form.phone" placeholder="手机号" maxlength="11" inputmode="tel" autocomplete="tel" :prefix-icon="'Iphone'" />
       </el-form-item>
       <el-form-item prop="nickname">
         <el-input v-model="form.nickname" placeholder="昵称（选填）" maxlength="32" :prefix-icon="'User'" />
       </el-form-item>
       <el-form-item prop="password">
-        <el-input v-model="form.password" type="password" placeholder="密码，6~32 位" show-password :prefix-icon="'Lock'" />
+        <el-input v-model="form.password" type="password" placeholder="密码，8~32 位，含字母和数字" show-password :prefix-icon="'Lock'" />
       </el-form-item>
       <el-form-item prop="confirm">
         <el-input v-model="form.confirm" type="password" placeholder="再次输入密码" show-password :prefix-icon="'Lock'" />
@@ -30,8 +30,9 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { type FormInstance, type FormRules } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { toast } from '@/utils/message'
+import { passwordRules } from '@/utils/validate'
 import NavBar from '@/components/NavBar.vue'
 import { useUserStore } from '@/stores/user'
 
@@ -44,7 +45,7 @@ const loading = ref(false)
 const form = reactive({ phone: '', nickname: '', password: '', confirm: '', agree: false })
 const rules: FormRules = {
   phone: [{ required: true, pattern: /^1\d{10}$/, message: '请输入正确的手机号', trigger: 'blur' }],
-  password: [{ required: true, min: 6, max: 32, message: '密码长度 6~32 位', trigger: 'blur' }],
+  password: passwordRules,
   confirm: [{
     validator: (_r, v, cb) => (v === form.password ? cb() : cb(new Error('两次输入的密码不一致'))),
     trigger: 'blur',
@@ -53,7 +54,7 @@ const rules: FormRules = {
 }
 
 async function submit() {
-  await formRef.value?.validate()
+  if (!(await formRef.value?.validate().catch(() => false))) return
   loading.value = true
   try {
     await user.register({ phone: form.phone, password: form.password, nickname: form.nickname || undefined, agree: form.agree })

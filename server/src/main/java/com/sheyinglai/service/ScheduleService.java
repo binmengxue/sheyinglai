@@ -12,6 +12,7 @@ import com.sheyinglai.mapper.ScheduleOffMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -63,10 +64,18 @@ public class ScheduleService {
         return new Views.ScheduleView(p.getMinHours(), p.getWorkStart(), p.getWorkEnd(), days);
     }
 
-    /** 摄影师切换某天休息 */
+    /** 摄影师切换某天休息；当天已有确认的预约时不能设为休息 */
+    @Transactional
     public void setOff(LocalDate date, boolean off) {
         Long uid = Auth.uid();
         if (off) {
+            photographerService.lock(uid);
+            boolean booked = bookingMapper.exists(new LambdaQueryWrapper<Booking>()
+                    .eq(Booking::getPhotographerId, uid).eq(Booking::getShootDate, date)
+                    .eq(Booking::getStatus, Booking.CONFIRMED));
+            if (booked) {
+                throw new BizException("这天已有确认的预约，不能设为休息");
+            }
             ScheduleOff s = new ScheduleOff();
             s.setPhotographerId(uid);
             s.setOffDate(date);
@@ -81,8 +90,18 @@ public class ScheduleService {
         }
     }
 
+    public boolean isOff(Long photographerId, LocalDate date) {
+        return offMapper.exists(new LambdaQueryWrapper<ScheduleOff>()
+                .eq(ScheduleOff::getPhotographerId, photographerId).eq(ScheduleOff::getOffDate, date));
+    }
+
     /** 校验这个时间段能约，不能约直接抛出原因 */
     public void checkBookable(Photographer p, LocalDate date, LocalTime start, int hours) {
+        checkBookable(p, date, start, hours, null);
+    }
+
+    /** excludeBookingId：改期时排除预约自己，避免和原来的时段冲突 */
+    public void checkBookable(Photographer p, LocalDate date, LocalTime start, int hours, Long excludeBookingId) {
         if (date.isAfter(LocalDate.now().plusDays(MAX_DAYS_AHEAD))) {
             throw new BizException("最多只能预约 " + MAX_DAYS_AHEAD + " 天内的档期");
         }
@@ -94,7 +113,9 @@ public class ScheduleService {
         }
         boolean off = offMapper.exists(new LambdaQueryWrapper<ScheduleOff>()
                 .eq(ScheduleOff::getPhotographerId, p.getUserId()).eq(ScheduleOff::getOffDate, date));
-        Views.DayInfo day = day(p, date, off, confirmed(p.getUserId(), date, date));
+        List<Booking> booked = confirmed(p.getUserId(), date, date).stream()
+                .filter(b -> !b.getId().equals(excludeBookingId)).toList();
+        Views.DayInfo day = day(p, date, off, booked);
         switch (day.status()) {
             case EXPIRED -> throw new BizException("这一天已经过去了");
             case OFF -> throw new BizException("摄影师这天休息");

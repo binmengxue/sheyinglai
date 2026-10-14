@@ -10,7 +10,7 @@
       <div class="title ellipsis">{{ a.title }}</div>
       <div class="meta">
         <span class="muted">{{ a.style || '其它' }} · {{ a.photoCount ?? 0 }}张</span>
-        <button class="like" :class="{ on: a.liked }" @click.prevent="toggle">
+        <button class="like" :class="{ on: a.liked }" :aria-label="a.liked ? '取消喜欢' : '喜欢'" @click.prevent="toggle">
           <el-icon><component :is="a.liked ? 'StarFilled' : 'Star'" /></el-icon>{{ a.likeCount || '' }}
         </button>
       </div>

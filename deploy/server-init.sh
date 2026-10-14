@@ -11,8 +11,9 @@ mkdir -p /srv/photo/uploads /srv/photo/logs /var/www/photo
 chown -R photo:photo /srv/photo
 chmod 755 /srv/photo /srv/photo/uploads   # 让 Nginx 能读取图片
 
-# 数据库和账号（密码请改成和 photo.env 里一致）
-DB_PASS=${DB_PASS:-ChangeMe_123}
+# 数据库和账号：密码必须通过环境变量传入，并和 photo.env 里一致
+#   DB_PASS='一个强密码' bash server-init.sh
+DB_PASS=${DB_PASS:?请先设置 DB_PASS，例如 DB_PASS='一个强密码' bash server-init.sh}
 mysql <<SQL
 CREATE DATABASE IF NOT EXISTS photo DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS 'photo'@'localhost' IDENTIFIED BY '${DB_PASS}';

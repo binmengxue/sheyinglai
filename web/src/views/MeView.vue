@@ -14,11 +14,11 @@
       <p class="bio">{{ u.bio || '介绍自己更容易获得关注哦' }}</p>
 
       <div class="stats">
-        <div><b>{{ fans }}</b><span>粉丝</span></div>
-        <div><b>{{ following }}</b><span>关注</span></div>
+        <RouterLink :to="`/p/${u.id}/follows?tab=fans`"><b>{{ fans }}</b><span>粉丝</span></RouterLink>
+        <RouterLink :to="`/p/${u.id}/follows?tab=following`"><b>{{ following }}</b><span>关注</span></RouterLink>
         <div class="ops">
           <el-dropdown trigger="click" @command="onMore">
-            <el-button round plain class="ghost" :icon="'Setting'" />
+            <el-button round plain class="ghost" :icon="'Setting'" aria-label="设置" />
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="logout">退出登录</el-dropdown-item>
@@ -77,8 +77,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { type UploadFile } from 'element-plus'
-import { confirm, toast } from '@/utils/message'
+import type { UploadFile } from 'element-plus'
+import { confirm, toast, singleFlight } from '@/utils/message'
 import AlbumCard from '@/components/AlbumCard.vue'
 import ReviewItem from '@/components/ReviewItem.vue'
 import { myLikes } from '@/api/album'
@@ -88,6 +88,7 @@ import { getPhotographer } from '@/api/photographer'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
 import { genderMark } from '@/utils/format'
+import { compressImage } from '@/utils/image'
 import type { Album, ReviewView } from '@/types'
 
 const user = useUserStore()
@@ -102,12 +103,18 @@ const likes = ref<Album[]>([])
 const reviews = ref<ReviewView[]>([])
 const reviewTotal = ref(0)
 
-async function onAvatar(f: UploadFile) {
+const onAvatar = singleFlight(async (f: UploadFile) => {
   if (!f.raw) return
-  if (f.raw.size > 1024 * 1024) return void toast.error('图片不可以超过 1M')
-  user.setUser(await uploadAvatar(f.raw))
+  let file: File
+  try {
+    // 头像显示很小，缩到 800px 足够
+    file = await compressImage(f.raw, { maxSide: 800 })
+  } catch (e) {
+    return void toast.error((e as Error).message)
+  }
+  user.setUser(await uploadAvatar(file))
   toast.success('头像已更新')
-}
+})
 
 async function onMore(cmd: string) {
   if (cmd === 'logout') {
@@ -146,7 +153,7 @@ h1 { margin: 0; font-size: 24px; }
 .gender.male { color: #7aa8ff; }
 .bio { margin: 14px 20px 0; font-size: 15px; opacity: 0.9; }
 .stats { display: flex; align-items: center; gap: 28px; padding: 16px 20px 0; }
-.stats > div:not(.ops) { display: flex; flex-direction: column; }
+.stats > :not(.ops) { display: flex; flex-direction: column; }
 .stats b { font-size: 22px; }
 .stats span { font-size: 12px; opacity: 0.6; }
 .ops { margin-left: auto; display: flex; gap: 8px; }

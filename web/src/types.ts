@@ -54,7 +54,7 @@ export interface User {
   city?: string
   wechat?: string
   role: 'USER' | 'ADMIN'
-  status: 'NORMAL' | 'BANNED'
+  status: 'NORMAL' | 'BANNED' | 'DELETED'
   createdAt: string
 }
 
@@ -176,7 +176,7 @@ export interface ScheduleView {
   days: DayInfo[]
 }
 
-export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'
+export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'EXPIRED'
 
 export interface Booking {
   id: number
@@ -196,6 +196,10 @@ export interface Booking {
   reviewed: boolean
   respondedAt?: string
   createdAt: string
+  cancelReason?: string
+  /** 按取消规则算出的违约金（元），线下结算 */
+  penaltyAmount?: number
+  rescheduleCount: number
 }
 
 export interface BookingView {
@@ -263,11 +267,41 @@ export interface AdminUserView {
 /** 站内消息 */
 export interface Notification {
   id: number
-  type: 'BOOKING' | 'REVIEW' | 'FOLLOW'
+  type: 'BOOKING' | 'REVIEW' | 'FOLLOW' | 'REPORT'
   title: string
   content?: string
   /** 点击后跳转的路由 */
   link?: string
   isRead: boolean
   createdAt: string
+}
+
+/** 取消前预览：penalty 现在取消要付的违约金（元） */
+export interface CancelPreview {
+  penalty: number
+  policy?: CancelPolicy
+  percent: number
+}
+
+export type ReportTargetType = 'PHOTOGRAPHER' | 'REVIEW' | 'ALBUM'
+export type ReportStatus = 'PENDING' | 'HANDLED' | 'IGNORED'
+
+export interface Report {
+  id: number
+  reporterId: number
+  targetType: ReportTargetType
+  targetId: number
+  reason: string
+  content?: string
+  status: ReportStatus
+  handleNote?: string
+  handledAt?: string
+  createdAt: string
+}
+
+export interface ReportView {
+  report: Report
+  reporter: UserBrief
+  /** 为空表示举报的内容已被删除 */
+  target?: { summary: string; link: string; ownerId: number }
 }

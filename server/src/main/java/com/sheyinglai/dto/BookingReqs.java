@@ -31,6 +31,24 @@ public final class BookingReqs {
             @Size(max = 500) String content) {
     }
 
+    /** acceptPenalty：要收违约金时，客户需要确认后才能取消 */
+    public record CancelReq(@Size(max = 200) String reason, boolean acceptPenalty) {
+        public static final CancelReq EMPTY = new CancelReq(null, false);
+    }
+
+    public record RescheduleReq(
+            @NotNull(message = "请选择日期") LocalDate shootDate,
+            @NotNull(message = "请选择开始时间") LocalTime startTime,
+            @NotNull @Min(1) @Max(12) Integer hours) {
+    }
+
+    public record ReportReq(
+            @NotBlank String targetType,
+            @NotNull Long targetId,
+            @NotBlank(message = "请选择举报原因") @Size(max = 32) String reason,
+            @Size(max = 500) String content) {
+    }
+
     public record OffReq(@NotNull LocalDate date, boolean off) {
     }
 }

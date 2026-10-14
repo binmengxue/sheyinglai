@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -34,12 +36,23 @@ public class AdminInitializer implements ApplicationRunner {
     private final PhotoMapper photoMapper;
     private final PhotographerService photographerService;
     private final PasswordEncoder encoder;
+    private final Environment env;
+
+    /** 本地默认密码，只允许在 h2 / dev 下使用 */
+    private static final String DEFAULT_PASSWORD = "admin123";
 
     @Override
     public void run(ApplicationArguments args) {
         AppProperties.Admin cfg = props.getAdmin();
         if (!StringUtils.hasText(cfg.getPhone()) || !StringUtils.hasText(cfg.getPassword())) {
             throw new IllegalStateException("请配置管理员账号 app.admin.phone / app.admin.password（环境变量 ADMIN_PHONE / ADMIN_PASSWORD）");
+        }
+        boolean local = env.acceptsProfiles(Profiles.of("h2", "dev"));
+        if (!local && DEFAULT_PASSWORD.equals(cfg.getPassword())) {
+            throw new IllegalStateException("线上环境的管理员密码不能用默认值，请设置环境变量 ADMIN_PASSWORD");
+        }
+        if (!local && cfg.getPassword().length() < 10) {
+            log.warn("管理员密码少于 10 位，建议在 ADMIN_PASSWORD 里换成更长的密码");
         }
 
         User admin = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, cfg.getPhone()));
@@ -54,6 +67,9 @@ public class AdminInitializer implements ApplicationRunner {
             admin.setCreatedAt(LocalDateTime.now());
             userMapper.insert(admin);
             log.info("已创建管理员账号 {}", cfg.getPhone());
+        } else if (!User.ROLE_ADMIN.equals(admin.getRole()) && !local) {
+            // 防止把 ADMIN_PHONE 改成别人的手机号后，启动时直接接管该用户的账号
+            throw new IllegalStateException("手机号 " + cfg.getPhone() + " 已被普通用户注册，不能自动设为管理员；请换一个手机号，或先在数据库里手动处理");
         } else if (!encoder.matches(cfg.getPassword(), admin.getPasswordHash())
                 || !User.ROLE_ADMIN.equals(admin.getRole()) || !User.STATUS_NORMAL.equals(admin.getStatus())) {
             // 配置文件是管理员密码的唯一来源，改了配置重启即生效

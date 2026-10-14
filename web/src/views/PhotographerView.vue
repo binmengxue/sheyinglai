@@ -1,7 +1,11 @@
 <template>
   <div v-if="d" class="profile" :class="{ 'has-bar': !d.self && ready }">
     <header class="hero">
-      <NavBar dark title="" fallback="/" />
+      <NavBar dark title="" fallback="/">
+        <template #right>
+          <ReportButton v-if="!d.self" target-type="PHOTOGRAPHER" :target-id="Number(id)" dark />
+        </template>
+      </NavBar>
       <div class="head">
         <el-avatar :size="84" :src="c.avatarUrl" class="avatar">{{ c.nickname.slice(0, 1) }}</el-avatar>
         <div class="who">
@@ -36,8 +40,8 @@
 
       <div class="stats">
         <div><b>{{ c.ratingCount ? Number(c.ratingAvg).toFixed(1) : '-' }}</b><span>评分</span></div>
-        <div><b>{{ d.fans }}</b><span>粉丝</span></div>
-        <div><b>{{ d.following }}</b><span>关注</span></div>
+        <RouterLink :to="`/p/${id}/follows?tab=fans`"><b>{{ d.fans }}</b><span>粉丝</span></RouterLink>
+        <RouterLink :to="`/p/${id}/follows?tab=following`"><b>{{ d.following }}</b><span>关注</span></RouterLink>
         <div class="ops">
           <template v-if="d.self">
             <el-button round plain class="ghost" @click="$router.push('/studio/profile')">接单设置</el-button>
@@ -77,7 +81,7 @@
       </template>
 
       <template v-else>
-        <ReviewItem v-for="r in reviews" :key="r.review.id" :r="r" />
+        <ReviewItem v-for="r in reviews" :key="r.review.id" :r="r" @deleted="onReviewDeleted" />
         <el-empty v-if="!reviews.length" description="还没有评价" />
         <div v-if="reviews.length < reviewTotal" class="more"><el-button round @click="loadReviews()">加载更多</el-button></div>
       </template>
@@ -108,11 +112,14 @@ import { useRouter } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
 import AlbumCard from '@/components/AlbumCard.vue'
 import ReviewItem from '@/components/ReviewItem.vue'
+import ReportButton from '@/components/ReportButton.vue'
 import PriceDetailDrawer from '@/components/PriceDetailDrawer.vue'
 import { follow, getPhotographer, listReviews, unfollow } from '@/api/photographer'
 import { listAlbums } from '@/api/album'
 import { useUserStore } from '@/stores/user'
-import { genderMark, getLocation } from '@/utils/format'
+import { genderMark, peekLocation } from '@/utils/format'
+import { usePagedList } from '@/composables/usePagedList'
+import { setTitle } from '@/utils/title'
 import { toast } from '@/utils/message'
 import type { Album, PhotographerDetail, ReviewView } from '@/types'
 
@@ -132,9 +139,13 @@ const priceVisible = ref(false)
 const style = ref('')
 const albums = ref<Album[]>([])
 const albumsLoading = ref(false)
-const reviews = ref<ReviewView[]>([])
-const reviewTotal = ref(0)
-let reviewPage = 0
+const { list: reviews, total: reviewTotal, load: loadReviews } = usePagedList<ReviewView>((page) =>
+  listReviews(Number(props.id), page))
+
+function onReviewDeleted(id: number) {
+  reviews.value = reviews.value.filter((x) => x.review.id !== id)
+  reviewTotal.value--
+}
 
 async function load() {
   const id = Number(props.id)
@@ -142,32 +153,29 @@ async function load() {
   error.value = false
   tab.value = 'albums'
   style.value = ''
-  reviews.value = []
-  reviewPage = 0
   try {
-    d.value = await getPhotographer(id, await getLocation())
+    // 主页不显示距离，不等定位（以前最多会卡 6 秒）；有缓存的定位就顺便带上
+    d.value = await getPhotographer(id, peekLocation() ?? null)
+    setTitle(`${d.value.card.nickname}的主页`)
   } catch {
     error.value = true
     return
   }
   loadAlbums()
-  loadReviews()
+  loadReviews(true)
 }
 
+let albumsSeq = 0
 async function loadAlbums() {
+  // 快速切换类型时只认最后一次请求
+  const mine = ++albumsSeq
   albumsLoading.value = true
   try {
-    albums.value = await listAlbums(Number(props.id), style.value || undefined)
+    const res = await listAlbums(Number(props.id), style.value || undefined)
+    if (mine === albumsSeq) albums.value = res
   } finally {
-    albumsLoading.value = false
+    if (mine === albumsSeq) albumsLoading.value = false
   }
-}
-
-async function loadReviews() {
-  const res = await listReviews(Number(props.id), reviewPage + 1)
-  reviews.value.push(...res.records)
-  reviewTotal.value = res.total
-  reviewPage++
 }
 
 function setStyle(s: string) {
@@ -225,7 +233,7 @@ h1 { margin: 0; font-size: 24px; }
 .entry span { font-size: 12px; opacity: 0.6; }
 .entry:disabled { opacity: 0.5; cursor: default; }
 .stats { display: flex; align-items: center; gap: 22px; padding: 18px 20px 0; }
-.stats > div:not(.ops) { display: flex; flex-direction: column; }
+.stats > :not(.ops) { display: flex; flex-direction: column; }
 .stats b { font-size: 22px; }
 .stats span { font-size: 12px; opacity: 0.6; }
 .ops { margin-left: auto; display: flex; gap: 8px; }
@@ -237,7 +245,7 @@ h1 { margin: 0; font-size: 24px; }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; min-height: 80px; }
 .more { text-align: center; padding: 12px; }
 .bar {
-  position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 20;
+  position: fixed; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20;
   width: calc(100% - 24px); max-width: calc(var(--app-width) - 24px);
   display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 18px; border-radius: 18px; background: #1b1c1e; color: #fff;
 }

@@ -18,6 +18,16 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
 // `pnpm dev:test` 时通过 .env.test 把 VITE_API_BASE 设为 /api-dev，直连测试环境
 const http = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '/api', timeout: 15000 })
 
+/** 接口错误：拦截器已经提示过（或调用方要求静默），全局错误处理不再重复提示 */
+export class ApiError extends Error {
+  readonly handled = true
+  constructor(message: string, readonly code?: number) {
+    super(message)
+  }
+}
+
+export const isHandledError = (e: unknown) => !!(e && typeof e === 'object' && (e as { handled?: boolean }).handled)
+
 /** 并发请求同时 401 时只提示、跳转一次 */
 let redirecting = false
 
@@ -32,18 +42,19 @@ http.interceptors.response.use(
     const body = res.data as Result<unknown>
     if (body.code !== 0) {
       if (!res.config.silent) toast.error(body.msg || '请求失败')
-      return Promise.reject(new Error(body.msg))
+      return Promise.reject(new ApiError(body.msg, body.code))
     }
     return res
   },
   (err) => {
+    err.handled = true
     const silent = err.config?.silent
     if (err.response?.status === 401) {
       clearToken()
       if (!silent && !redirecting) {
         redirecting = true
         toast.warning('登录已过期，请重新登录')
-        location.href = '/login?redirect=' + encodeURIComponent(location.pathname)
+        location.href = '/login?redirect=' + encodeURIComponent(location.pathname + location.search)
       }
     } else if (silent) {
       // 调用方自己处理

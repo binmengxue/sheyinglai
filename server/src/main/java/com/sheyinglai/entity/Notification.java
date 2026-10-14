@@ -14,6 +14,7 @@ public class Notification {
     public static final String TYPE_BOOKING = "BOOKING";
     public static final String TYPE_REVIEW = "REVIEW";
     public static final String TYPE_FOLLOW = "FOLLOW";
+    public static final String TYPE_REPORT = "REPORT";
 
     @TableId(type = IdType.AUTO)
     private Long id;

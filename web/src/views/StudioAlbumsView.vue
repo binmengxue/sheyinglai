@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { toast, confirm } from '@/utils/message'
+import { toast, confirm, singleFlight } from '@/utils/message'
 import NavBar from '@/components/NavBar.vue'
 import AlbumDialog from '@/components/AlbumDialog.vue'
 import { deleteAlbum, myAlbums } from '@/api/album'
@@ -56,13 +56,13 @@ function openDialog(a: Album | null) {
   dialog.value = true
 }
 
-async function remove(a: Album) {
+const remove = singleFlight(async (a: Album) => {
   const ok = await confirm(`删除「${a.title}」及其中 ${a.photoCount ?? 0} 张照片？此操作不可恢复`, { title: '确认删除', confirmText: '删除' })
   if (!ok) return
   await deleteAlbum(a.id)
   toast.success('已删除')
   load()
-}
+})
 
 onMounted(load)
 </script>

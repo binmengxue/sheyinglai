@@ -12,7 +12,7 @@
       <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
       <div class="el-upload__text">把照片拖到这里，或 <em>点击选择</em></div>
       <template #tip>
-        <div class="el-upload__tip">支持 jpg / png / webp / gif，单张不超过 {{ MAX_MB }}MB，可多选</div>
+        <div class="el-upload__tip">支持 jpg / png / webp / gif，可多选；大图会自动压缩到 {{ MAX_MB }}MB 以内</div>
       </template>
     </el-upload>
 
@@ -40,9 +40,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { isAxiosError } from 'axios'
-import { type UploadFile } from 'element-plus'
+import type { UploadFile } from 'element-plus'
 import { toast } from '@/utils/message'
 import { uploadPhoto } from '@/api/photo'
+import { compressImage } from '@/utils/image'
 
 const props = defineProps<{ albumId: number }>()
 const visible = defineModel<boolean>({ required: true })
@@ -64,10 +65,6 @@ watch(visible, (v) => { if (v) tasks.value = [] })
 
 function onChange(f: UploadFile) {
   if (!f.raw) return
-  if (f.raw.size > MAX_MB * 1024 * 1024) {
-    toast.error(`图片不可以超过 ${MAX_MB}M（${f.name}）`)
-    return
-  }
   tasks.value.push({ uid: f.uid, file: f.raw, name: f.name, progress: 0, status: 'waiting' })
 }
 
@@ -77,7 +74,10 @@ function remove(t: Task) {
 
 async function runOne(t: Task) {
   t.status = 'uploading'
+  t.progress = 0
   try {
+    // 压缩后替换，重试时不用再压一次
+    t.file = await compressImage(t.file)
     await uploadPhoto(props.albumId, t.file, (p) => (t.progress = p))
     t.progress = 100
     t.status = 'success'

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { toast } from '@/utils/message'
+import { setTitle } from '@/utils/title'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -23,6 +24,8 @@ const router = createRouter({
     { path: '/p/:id', name: 'photographer', component: () => import('@/views/PhotographerView.vue'), props: true },
     { path: '/p/:id/schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue'), props: true, meta: { title: '达人档期' } },
     { path: '/albums/:id', name: 'album', component: () => import('@/views/AlbumDetailView.vue'), props: true },
+    { path: '/orders/:id(\\d+)', name: 'order', component: () => import('@/views/OrderDetailView.vue'), props: true, meta: { auth: true, studio: true, title: '订单详情' } },
+    { path: '/p/:id/follows', name: 'follows', component: () => import('@/views/FollowsView.vue'), props: true, meta: { title: '关注和粉丝' } },
     { path: '/orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { tab: 'orders', auth: true, studio: true, title: '我的订单' } },
     { path: '/me', name: 'me', component: () => import('@/views/MeView.vue'), meta: { tab: 'me', auth: true, studio: true, title: '个人中心' } },
     { path: '/messages', name: 'messages', component: () => import('@/views/MessagesView.vue'), meta: { auth: true, studio: true, title: '消息' } },
@@ -53,8 +56,6 @@ router.beforeEach(async (to) => {
   }
 })
 
-router.afterEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} · 摄影来` : '摄影来 · 约拍摄影师'
-})
+router.afterEach((to) => setTitle(to.meta.title))
 
 export default router

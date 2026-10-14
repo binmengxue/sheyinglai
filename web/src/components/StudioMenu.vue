@@ -43,7 +43,11 @@ const items = computed(() => {
 })
 
 /** 编辑资料归到「个人中心」下高亮 */
-const active = computed(() => (route.path === '/me/edit' ? '/me' : route.path))
+const active = computed(() => {
+  if (route.path === '/me/edit') return '/me'
+  if (route.path.startsWith('/orders/')) return '/orders'
+  return route.path
+})
 </script>
 
 <style lang="scss" scoped>
