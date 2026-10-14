@@ -8,6 +8,11 @@
         <RouterLink to="/me" :class="{ active: route.meta.studio && route.path !== '/orders' }">工作台</RouterLink>
       </nav>
       <div class="right">
+        <RouterLink v-if="user.loggedIn" to="/chats" class="bell" title="私信">
+          <el-badge :value="chat.unread" :hidden="!chat.unread" :max="99">
+            <el-icon :size="22"><ChatDotRound /></el-icon>
+          </el-badge>
+        </RouterLink>
         <RouterLink v-if="user.loggedIn" to="/messages" class="bell" title="消息">
           <el-badge :value="notification.unread" :hidden="!notification.unread" :max="99">
             <el-icon :size="22"><Bell /></el-icon>
@@ -40,10 +45,12 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
+import { useChatStore } from '@/stores/chat'
 import { confirm, toast } from '@/utils/message'
 
 const user = useUserStore()
 const notification = useNotificationStore()
+const chat = useChatStore()
 const route = useRoute()
 const router = useRouter()
 

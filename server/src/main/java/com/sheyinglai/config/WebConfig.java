@@ -21,7 +21,8 @@ public class WebConfig implements WebMvcConfigurer {
     /** 开启 Sa-Token 注解鉴权（@SaCheckLogin） */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new SaInterceptor()).addPathPatterns("/**");
+        // 私信 WebSocket 在连接后自己校验 token（见 ChatSocketHandler）
+        registry.addInterceptor(new SaInterceptor()).addPathPatterns("/**").excludePathPatterns("/ws/**");
     }
 
     /** local 存储模式下，/api/files/** 直接映射到磁盘目录 */

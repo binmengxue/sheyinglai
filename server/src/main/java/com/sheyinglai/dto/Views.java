@@ -8,6 +8,7 @@ import com.sheyinglai.entity.User;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -105,5 +106,9 @@ public final class Views {
     }
 
     public record AdminUserView(User user, Photographer photographer) {
+    }
+
+    /** 私信会话列表的一项：peer 是对方，unread 是我的未读数 */
+    public record ChatConversationView(Long id, UserBrief peer, String lastMsg, LocalDateTime lastAt, int unread) {
     }
 }

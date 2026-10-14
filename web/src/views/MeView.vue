@@ -31,6 +31,13 @@
 
       <!-- PC 上左侧菜单已有这些入口 -->
       <div class="entries mobile-only">
+        <RouterLink to="/chats" class="entry">
+          <b>
+            <el-icon><ChatDotRound /></el-icon> 私信
+            <el-badge v-if="chat.unread" :value="chat.unread" :max="99" class="count" />
+          </b>
+          <span>和客户、摄影师聊一聊</span>
+        </RouterLink>
         <RouterLink to="/messages" class="entry">
           <b>
             <el-icon><Bell /></el-icon> 消息
@@ -87,12 +94,14 @@ import { uploadAvatar } from '@/api/auth'
 import { getPhotographer } from '@/api/photographer'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
+import { useChatStore } from '@/stores/chat'
 import { genderMark } from '@/utils/format'
 import { compressImage } from '@/utils/image'
 import type { Album, ReviewView } from '@/types'
 
 const user = useUserStore()
 const notification = useNotificationStore()
+const chat = useChatStore()
 const router = useRouter()
 const u = computed(() => user.user)
 

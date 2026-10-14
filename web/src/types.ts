@@ -276,6 +276,33 @@ export interface Notification {
   createdAt: string
 }
 
+/** 私信会话：peer 是对方，unread 是我的未读数 */
+export interface ChatConversation {
+  id: number
+  peer: UserBrief
+  lastMsg?: string
+  lastAt?: string
+  unread: number
+}
+
+/** 私信消息：IMAGE 的 content 是图片地址 */
+export interface ChatMessage {
+  id: number
+  conversationId: number
+  senderId: number
+  type: 'TEXT' | 'IMAGE'
+  content: string
+  createdAt: string
+}
+
+/** WebSocket 推送的新消息（自己发的也会推给自己的其它页面） */
+export interface ChatPush {
+  type: 'message'
+  conversationId: number
+  message: ChatMessage
+  sender: UserBrief
+}
+
 /** 取消前预览：penalty 现在取消要付的违约金（元） */
 export interface CancelPreview {
   penalty: number

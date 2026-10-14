@@ -48,6 +48,18 @@ export function ymd(d = new Date()) {
 /** 2026-10-12T09:54:54.195 -> 2026-10-12 09:54 */
 export const fmtDateTime = (s?: string) => (s ? s.replace('T', ' ').slice(0, 16) : '')
 
+/** 私信时间：今天只显示 12:30，今年显示 10-12 12:30，更早显示完整日期；short 时不带时分（会话列表用） */
+export function fmtChatTime(s?: string, short = false) {
+  if (!s) return ''
+  const t = s.replace('T', ' ')
+  const today = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const ymd = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+  if (t.startsWith(ymd)) return t.slice(11, 16)
+  if (t.startsWith(String(today.getFullYear()))) return short ? t.slice(5, 10) : t.slice(5, 16)
+  return short ? t.slice(0, 10) : t.slice(0, 16)
+}
+
 const WEEK = ['日', '一', '二', '三', '四', '五', '六']
 /** 2026-10-12 -> 10月12日 周一 */
 export function fmtDay(s: string) {

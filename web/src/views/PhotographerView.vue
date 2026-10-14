@@ -48,6 +48,7 @@
             <el-button round class="cta" @click="$router.push('/studio/albums')">管理客片</el-button>
           </template>
           <template v-else>
+            <el-button round plain class="ghost" :icon="'ChatDotRound'" :loading="openingChat" @click="toChat">聊一聊</el-button>
             <el-button round plain class="ghost" :icon="d.followed ? 'Check' : 'Plus'" :loading="following" @click="toggleFollow">
               {{ d.followed ? '已关注' : '关注' }}
             </el-button>
@@ -116,6 +117,7 @@ import ReportButton from '@/components/ReportButton.vue'
 import PriceDetailDrawer from '@/components/PriceDetailDrawer.vue'
 import { follow, getPhotographer, listReviews, unfollow } from '@/api/photographer'
 import { listAlbums } from '@/api/album'
+import { openChat } from '@/api/chat'
 import { useUserStore } from '@/stores/user'
 import { genderMark, peekLocation } from '@/utils/format'
 import { usePagedList } from '@/composables/usePagedList'
@@ -205,6 +207,24 @@ async function toggleFollow() {
     toast.success(v.followed ? '已关注' : '已取消关注')
   } finally {
     following.value = false
+  }
+}
+
+const openingChat = ref(false)
+
+/** 聊一聊：找到或创建和 TA 的会话，进入聊天页 */
+async function toChat() {
+  if (!user.loggedIn) {
+    toast.info('请先登录')
+    return router.push({ path: '/login', query: { redirect: `/p/${props.id}` } })
+  }
+  if (openingChat.value) return
+  openingChat.value = true
+  try {
+    const c = await openChat(d.value!.card.id)
+    router.push(`/chats/${c.id}`)
+  } finally {
+    openingChat.value = false
   }
 }
 

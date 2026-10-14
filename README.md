@@ -8,6 +8,7 @@ Vue 3 + Element Plus 前端（手机版式 H5），Spring Boot 3 后端。多摄
 - **档期与预约**：月历显示可约时段，客户提交预约，摄影师确认 / 拒绝 / 完成；**不在线付款**，确认后客户可以看到摄影师联系方式，线下沟通付款
 - **订单规则**：客户可改期（回到待确认，最多 3 次）；取消时按摄影师的取消规则计算违约金（线下结算），需要客户确认；拍摄时间到了还没确认的预约自动过期，拍摄日 3 天后自动完成；拍摄前一天提醒双方
 - **站内消息**：预约状态变化、新评价、新粉丝、举报处理结果都会通知，右上角铃铛显示未读数
+- **私信（聊一聊）**：在摄影师主页点「聊一聊」实时私聊，支持文字和图片；自建 WebSocket 推送（`/api/ws/chat`），不依赖第三方 IM、没有额外费用
 - **评价**：完成后客户打分评价，自动更新评分
 - **经营数据**：曝光、主页浏览、咨询量（昨日环比 + 30 天），订单均价、成交率、接单率、回复时长
 - **喜欢客片、关注 / 粉丝列表、我的点评**
@@ -119,6 +120,11 @@ pnpm dev
 | GET | /me/stats | 经营数据 | ✅ |
 | GET | /me/notifications、/me/notifications/unread-count | 站内消息、未读数 | ✅ |
 | POST | /me/notifications/{id}/read、/me/notifications/read-all | 标记已读 | ✅ |
+| POST | /me/chats/open?peerId= | 找到或创建和某人的私信会话 | ✅ |
+| GET | /me/chats、/me/chats/{id}、/me/chats/unread-count | 私信会话列表、单个会话、未读数 | ✅ |
+| GET | /me/chats/{id}/messages?before= | 私信历史（按 id 往前翻） | ✅ |
+| POST | /me/chats/{id}/messages、/me/chats/{id}/images、/me/chats/{id}/read | 发文字、发图片、标记已读 | ✅ |
+| WS | /ws/chat | 私信推送；连上后先发 `{"type":"auth","token":"..."}` | ✅ |
 | POST | /reports | 举报（targetType：PHOTOGRAPHER / REVIEW / ALBUM） | ✅ |
 | GET | /admin/users?keyword= | 用户列表（管理员） | ✅ |
 | PUT | /admin/users/{id}/banned?value= | 封禁 / 解封（管理员） | ✅ |
@@ -210,7 +216,7 @@ ssl_certificate_key /etc/nginx/cert/sheyinglai.top.key;
 
 1. `mkdir -p /srv/photo-dev/{uploads,logs} && chown -R photo:photo /srv/photo-dev`，建库 `photo_dev`，并**单独建一个 `photo_dev` 数据库账号**只授权这个库（SQL 见 `deploy/photo-dev.env.example`），不要和线上共用账号。
 2. 复制 `deploy/photo-dev.env.example` 为 `/srv/photo-dev/photo.env`（`chmod 600`），`deploy/photo-dev.service` 放到 `/etc/systemd/system/`。
-3. 更新 Nginx 配置（已含 `/api-dev/` 转发）：`nginx -t && systemctl reload nginx`。
+3. 更新 Nginx 配置（已含 `/api-dev/` 转发和私信 WebSocket 的 `/api/ws/`、`/api-dev/ws/`）：`nginx -t && systemctl reload nginx`。
 4. 打包后端 `mvn -q clean package`，上传 `server/target/app.jar` 到 `/srv/photo-dev/app.jar`，`systemctl enable --now photo-dev`。
 
 **本地使用**：

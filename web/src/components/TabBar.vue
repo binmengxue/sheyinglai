@@ -1,7 +1,7 @@
 <template>
   <nav class="tabbar">
     <RouterLink v-for="t in tabs" :key="t.key" :to="t.to" class="tab" :class="{ active: active === t.key }">
-      <el-badge :value="notification.unread" :hidden="t.key !== 'me' || !notification.unread" :max="99">
+      <el-badge :value="meUnread" :hidden="t.key !== 'me' || !meUnread" :max="99">
         <el-icon :size="22"><component :is="t.icon" /></el-icon>
       </el-badge>
       <span>{{ t.label }}</span>
@@ -10,10 +10,15 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useNotificationStore } from '@/stores/notification'
+import { useChatStore } from '@/stores/chat'
 
 defineProps<{ active: 'home' | 'orders' | 'me' }>()
 const notification = useNotificationStore()
+const chat = useChatStore()
+/** 「我」上的角标：通知和私信未读之和 */
+const meUnread = computed(() => notification.unread + chat.unread)
 
 const tabs = [
   { key: 'home', to: '/', label: '首页', icon: 'House' },

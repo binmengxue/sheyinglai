@@ -12,6 +12,7 @@
         <el-icon><component :is="m.icon" /></el-icon>
         <span>{{ m.label }}</span>
         <el-badge v-if="m.to === '/messages' && notification.unread" :value="notification.unread" :max="99" class="count" />
+        <el-badge v-if="m.to === '/chats' && chat.unread" :value="chat.unread" :max="99" class="count" />
       </el-menu-item>
     </el-menu>
   </nav>
@@ -22,9 +23,11 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
+import { useChatStore } from '@/stores/chat'
 
 const user = useUserStore()
 const notification = useNotificationStore()
+const chat = useChatStore()
 const route = useRoute()
 
 const items = computed(() => {
@@ -32,6 +35,7 @@ const items = computed(() => {
   return [
     { to: '/me', label: '个人中心', icon: 'House' },
     { to: '/orders', label: '我的订单', icon: 'Tickets' },
+    { to: '/chats', label: '私信', icon: 'ChatDotRound' },
     { to: '/messages', label: '消息', icon: 'Bell' },
     { to: '/studio/albums', label: '我的客片', icon: 'Picture' },
     { to: '/studio/profile', label: '接单设置', icon: 'Setting' },
@@ -46,6 +50,7 @@ const items = computed(() => {
 const active = computed(() => {
   if (route.path === '/me/edit') return '/me'
   if (route.path.startsWith('/orders/')) return '/orders'
+  if (route.path.startsWith('/chats/')) return '/chats'
   return route.path
 })
 </script>

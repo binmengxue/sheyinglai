@@ -29,14 +29,17 @@ import StudioMenu from '@/components/StudioMenu.vue'
 import { useDevice } from '@/composables/useDevice'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
+import { useChatStore } from '@/stores/chat'
 
 const route = useRoute()
 const { isDesktop } = useDevice()
 
-// 登录后开始轮询未读消息，退出后停止
+// 登录后开始轮询未读消息、连上私信推送，退出后停止；换账号时重新连接
 const user = useUserStore()
 const notification = useNotificationStore()
+const chat = useChatStore()
 watch(() => user.loggedIn, (on) => (on ? notification.start() : notification.stop()), { immediate: true })
+watch(() => user.user?.id, (id) => (id ? chat.start() : chat.stop()), { immediate: true })
 </script>
 
 <style lang="scss" scoped>
