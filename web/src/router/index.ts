@@ -31,6 +31,7 @@ const router = createRouter({
     { path: '/chats', name: 'chats', component: () => import('@/views/ChatListView.vue'), meta: { auth: true, studio: true, title: '私信' } },
     { path: '/chats/:id(\\d+)', name: 'chat', component: () => import('@/views/ChatView.vue'), props: true, meta: { auth: true, studio: true, title: '私信' } },
     { path: '/messages', name: 'messages', component: () => import('@/views/MessagesView.vue'), meta: { auth: true, studio: true, title: '消息' } },
+    { path: '/me/resume', name: 'resume', component: () => import('@/views/ResumeView.vue'), meta: { auth: true, studio: true, title: '我的简历' } },
     { path: '/me/edit', name: 'profile-edit', component: () => import('@/views/ProfileEditView.vue'), meta: { auth: true, studio: true, title: '编辑资料' } },
     { path: '/studio/profile', name: 'studio-profile', component: () => import('@/views/StudioProfileView.vue'), meta: { auth: true, studio: true, title: '接单设置' } },
     { path: '/studio/albums', name: 'studio-albums', component: () => import('@/views/StudioAlbumsView.vue'), meta: { auth: true, studio: true, title: '我的客片' } },

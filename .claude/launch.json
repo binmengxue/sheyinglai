@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "server",
+      "runtimeExecutable": "mvn",
+      "runtimeArgs": [
+        "-f", "server/pom.xml", "spring-boot:run",
+        "-Dspring-boot.run.arguments=--server.port=18080 --spring.datasource.url=jdbc:h2:file:./target/preview-db/photo;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=VALUE --app.storage.local.dir=target/preview-uploads",
+        "-Dspring-boot.run.jvmArguments=-Djdk.net.unixdomain.tmpdir=C:/tmp"
+      ],
+      "port": 18080,
+      "autoPort": false
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "web", "dev", "--port", "5174", "--strictPort"],
+      "env": { "API_TARGET": "http://localhost:18080" },
+      "port": 5174,
+      "autoPort": false
+    }
+  ]
+}

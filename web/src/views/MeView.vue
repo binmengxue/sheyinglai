@@ -91,7 +91,7 @@ import AlbumCard from '@/components/AlbumCard.vue'
 import ReviewItem from '@/components/ReviewItem.vue'
 import { myLikes } from '@/api/album'
 import { myReviews } from '@/api/booking'
-import { getResume, uploadAvatar } from '@/api/auth'
+import { uploadAvatar } from '@/api/auth'
 import { getPhotographer } from '@/api/photographer'
 import { useUserStore } from '@/stores/user'
 import { useNotificationStore } from '@/stores/notification'
@@ -129,20 +129,8 @@ const onAvatar = singleFlight(async (f: UploadFile) => {
 /** 简历只给这个手机号的账号看，后端也会校验 */
 const RESUME_PHONE = '18701309020'
 
-async function openResume() {
-  // 先同步开窗口，await 之后再开会被浏览器当成弹窗拦截
-  const w = window.open('', '_blank')
-  try {
-    const url = URL.createObjectURL(await getResume())
-    if (w) w.location.href = url
-    else location.href = url
-  } catch {
-    w?.close()
-  }
-}
-
 async function onMore(cmd: string) {
-  if (cmd === 'resume') return openResume()
+  if (cmd === 'resume') return router.push('/me/resume')
   if (cmd === 'logout') {
     if (!(await confirm('确定退出登录？', { type: 'info' }))) return
     await user.logout()

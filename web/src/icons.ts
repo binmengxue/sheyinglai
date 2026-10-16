@@ -1,7 +1,7 @@
 import type { App } from 'vue'
 import {
   ArrowDown, ArrowLeft, ArrowRight, Bell, Calendar, Camera, ChatDotRound, Check, CircleCheckFilled, CopyDocument, DataLine, Delete,
-  Discount, Edit, Grid, House, Iphone, Location, Lock, Management, Picture, Plus, Search, Setting, Star, StarFilled,
+  Discount, Download, Edit, Grid, House, Iphone, Location, Lock, Management, Picture, Plus, Search, Setting, Star, StarFilled,
   SwitchButton, Tickets, Upload, UploadFilled, User, Warning,
 } from '@element-plus/icons-vue'
 
@@ -12,7 +12,7 @@ import {
  */
 const icons = {
   ArrowDown, ArrowLeft, ArrowRight, Bell, Calendar, Camera, ChatDotRound, Check, CircleCheckFilled, CopyDocument, DataLine, Delete,
-  Discount, Edit, Grid, House, Iphone, Location, Lock, Management, Picture, Plus, Search, Setting, Star, StarFilled,
+  Discount, Download, Edit, Grid, House, Iphone, Location, Lock, Management, Picture, Plus, Search, Setting, Star, StarFilled,
   SwitchButton, Tickets, Upload, UploadFilled, User, Warning,
 }
 
