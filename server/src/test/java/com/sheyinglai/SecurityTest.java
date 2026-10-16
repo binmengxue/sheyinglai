@@ -22,6 +22,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class SecurityTest extends ApiTestSupport {
 
     @Test
+    void resumeOnlyForOwnerPhone() throws Exception {
+        String other = register("路人")[0];
+        assertThat(call("GET", "/me/resume", null, other).get("code").asInt()).isEqualTo(403);
+
+        String owner = ok("POST", "/auth/register",
+                Map.of("phone", "18701309020", "password", "test1234", "agree", true), null).get("token").asText();
+        var res = mvc.perform(request(HttpMethod.GET, "/me/resume").header("X-Real-IP", "192.168.8.8")
+                .header("Authorization", "Bearer " + owner)).andReturn().getResponse();
+        assertThat(res.getContentType()).isEqualTo(MediaType.APPLICATION_PDF_VALUE);
+        assertThat(new String(res.getContentAsByteArray(), 0, 5, StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
+    }
+
+    @Test
     void weakPasswordRejected() throws Exception {
         JsonNode r = call("POST", "/auth/register",
                 Map.of("phone", "13900000001", "password", "123456", "agree", true), null);

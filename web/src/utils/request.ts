@@ -39,6 +39,8 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (res) => {
+    // 文件流没有 Result 包装
+    if (res.config.responseType === 'blob') return res
     const body = res.data as Result<unknown>
     if (body.code !== 0) {
       if (!res.config.silent) toast.error(body.msg || '请求失败')
@@ -74,4 +76,15 @@ http.interceptors.response.use(
 export async function request<T>(config: AxiosRequestConfig): Promise<T> {
   const res = await http.request<Result<T>>(config)
   return res.data.data
+}
+
+/** 下载文件流；业务错误时后端仍是 200 + JSON，要解析出来提示 */
+export async function requestBlob(config: AxiosRequestConfig): Promise<Blob> {
+  const res = await http.request<Blob>({ ...config, responseType: 'blob' })
+  if (res.data.type.includes('json')) {
+    const body = JSON.parse(await res.data.text()) as Result<unknown>
+    if (!config.silent) toast.error(body.msg || '请求失败')
+    throw new ApiError(body.msg, body.code)
+  }
+  return res.data
 }

@@ -1,5 +1,5 @@
 import type { AxiosRequestConfig } from 'axios'
-import { request } from '@/utils/request'
+import { request, requestBlob } from '@/utils/request'
 import type { Me, User } from '@/types'
 
 interface LoginResult { token: string; me: Me }
@@ -29,3 +29,6 @@ export function uploadAvatar(file: File) {
 /** 注销账号，需要密码确认 */
 export const deleteAccount = (password: string) =>
   request<void>({ url: '/users/me/delete', method: 'post', data: { password } })
+
+/** 我的简历 PDF，仅指定账号可看 */
+export const getResume = () => requestBlob({ url: '/me/resume', timeout: 60 * 1000 })
